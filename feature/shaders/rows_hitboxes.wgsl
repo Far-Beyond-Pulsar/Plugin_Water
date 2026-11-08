@@ -1,7 +1,8 @@
-// Water hitbox rows' placement: a body bounded by the meshes its owner holds.
+// Water hitbox rows' placement: a body bounded by the content its owner holds.
 
-// A body's world bounds: the AABB of the bounding spheres of every mesh its
-// owner holds (attached and enabled), placed by the owner's transform. `w` of
+// A body's world bounds: the AABB of the bounding spheres of the content its
+// owner holds (the join's `owner_bounds`: attached and enabled), placed by the
+// owner's transform. `w` of
 // `lo` is 1 when the owner holds any.
 struct BodyBounds {
     lo: vec4<f32>,
@@ -18,12 +19,12 @@ fn body_bounds(row: u32) -> BodyBounds {
     var lo = vec3<f32>(3.0e38);
     var hi = vec3<f32>(-3.0e38);
     var found = 0.0;
-    let instances = min(arrayLength(&mesh_bounds), arrayLength(&owners));
+    let instances = min(arrayLength(&owner_bounds), arrayLength(&owners));
     for (var i = 0u; i < instances; i++) {
-        let sphere = mesh_bounds[i];
-        let mesh = owners[i];
-        if sphere.w <= 0.0 || mesh.enabled == 0u || mesh.owner_index != body.owner_index
-            || mesh.owner_generation != body.owner_generation {
+        let sphere = owner_bounds[i];
+        let content = owners[i];
+        if sphere.w <= 0.0 || content.enabled == 0u || content.owner_index != body.owner_index
+            || content.owner_generation != body.owner_generation {
             continue;
         }
         let center = position + r * (sphere.xyz * scale);
@@ -35,7 +36,7 @@ fn body_bounds(row: u32) -> BodyBounds {
     return BodyBounds(vec4<f32>(lo, found), hi);
 }
 
-// A body whose owner holds no meshes has no bounds: not placed.
+// A body whose owner holds no content has no bounds: not placed.
 fn placement_placed(row: u32) -> bool {
     return body_bounds(row).lo.w != 0.0;
 }

@@ -43,7 +43,7 @@ const HITBOXES_PLACEMENT: Placement = Placement::new(
     include_str!("../shaders/rows_hitboxes.wgsl"),
 )
 .from_owner()
-.mesh_bounded();
+.owner_bounded();
 
 pub const WATER_VOLUMES_KEY: BufferKey = BufferKey::of("water_volumes");
 pub const WATER_HITBOXES_KEY: BufferKey = BufferKey::of("water_hitboxes");
