@@ -5,7 +5,7 @@
 //! for specular anti-aliasing, roughness and occlusion as data.
 use crate::common::{spawn_mesh, spawn_object};
 use glam::{Mat4, Quat, Vec3};
-use helio_mats::texture_mips::{mip_chain, TexelKind};
+use helio_core::texture_mips::{mip_chain, TexelKind};
 use pulsar_scenedb::World;
 use std::path::Path;
 

@@ -28,7 +28,7 @@ inventory::submit! {
         origin: pulsar_plugins::origin!(),
         name: "water.volumes",
         register_columns: water_component::register_columns,
-        derivation: water_component::derivation,
+        derivation: Some(water_component::derivation),
     }
 }
 
@@ -111,5 +111,21 @@ mod tests {
                 "{summary:?}"
             );
         }
+    }
+}
+
+// ── Records ──
+
+// A water volume takes its sun from the level's directional light (#1065):
+// the `sun_direction` levels saved before that is dropped on load.
+inventory::submit! {
+    pulsar_class::records::RecordMigrationRegistration {
+        origin: pulsar_plugins::origin!(),
+        name: "water.retired_fields",
+        description: "removed the water volume's retired sun_direction",
+        entries: None,
+        from_props: None,
+        stale_props: &[],
+        retired_fields: &[("WaterVolumeComponent", "sun_direction")],
     }
 }

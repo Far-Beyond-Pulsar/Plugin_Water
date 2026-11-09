@@ -115,5 +115,5 @@ either way. Terrain-derived shoreline depth/travel-time is opt-in through
   advected shore foam, marine snow, and surfacing lens droplets remain to be
   ported.
 - Sparse surface queries and buoyancy/drag calculations exist, but no current
-  physics runtime submits floater points or applies forces; the `pulsar_physics`
-  crate currently registers component data without a simulation backend.
+  physics runtime submits floater points or applies forces: the physics
+  plugin's simulation does not read water samples yet.

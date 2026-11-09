@@ -403,7 +403,7 @@ fn water_takes_the_scenes_sun_and_the_global_wind() {
 #[test]
 fn bodies_on_the_water_sim_channel_become_water_hitboxes() {
     use meshes_component::components::StaticMeshComponent;
-    use pulsar_physics::{CollisionChannel, PhysicsComponent};
+    use physics_plugin::legacy::{CollisionChannel, PhysicsComponent};
     type HitboxRow = helio_pass_water_sim::GpuWaterHitbox;
     let Some((device, queue)) = device() else {
         eprintln!("skipping: no GPU adapter available");
@@ -467,8 +467,8 @@ fn bodies_on_the_water_sim_channel_become_water_hitboxes() {
     assert_eq!(
         rows[0].params,
         [
-            pulsar_physics::WATER_HITBOX_EDGE_SOFTNESS,
-            pulsar_physics::WATER_HITBOX_STRENGTH,
+            physics_plugin::legacy::WATER_HITBOX_EDGE_SOFTNESS,
+            physics_plugin::legacy::WATER_HITBOX_STRENGTH,
             (hull.index() + 1) as f32,
             0.0
         ]

@@ -289,34 +289,34 @@ impl ApplicationHandler for App {
                         .join(format!("{time_of_day}.hdr"))
                 });
             if time_of_day == "night" {
-                // Stars, the Milky Way and a nebula: the built-in galaxy + nebula
-                // panorama (CC0 Deep-Space Skybox) under dense procedural stars,
-                // tilted so the galactic band arcs across the frame.
+                // Dense procedural stars; a night panorama, when the assets
+                // hold one, sits under them (no panorama is built into the
+                // binary: `helio_pass_sky::sky_texture`).
                 sky.star_count = 9000.0;
                 sky.star_brightness = 3.2;
                 sky.shooting_star_rate = 0.05;
-                if helio_pass_sky::sky_texture::presets_available() {
-                    sky.sky_texture_source = helio_pass_sky::sky_texture::source::GALAXY_NEBULA;
-                    helio_pass_sky::sky_texture::set_requested(sky.sky_texture_source);
-                    sky.sky_texture_intensity = 28.0;
-                    sky.sky_texture_opacity = 1.0;
-                    // WATER_SKY_ROT="yaw,pitch,roll" (radians) re-orients the band.
-                    let rot: Vec<f32> = std::env::var("WATER_SKY_ROT")
-                        .ok()
-                        .map(|v| v.split(',').filter_map(|n| n.trim().parse().ok()).collect())
-                        .filter(|v: &Vec<f32>| v.len() == 3)
-                        .unwrap_or_else(|| vec![3.0, 0.3, 1.0]);
-                    sky.sky_texture_yaw = rot[0];
-                    sky.sky_texture_pitch = rot[1];
-                    sky.sky_texture_roll = rot[2];
-                } else if hdri.exists() {
-                    sky.sky_texture_source = helio_pass_sky::sky_texture::custom_source(&hdri);
+                if hdri.exists() {
+                    sky.sky_texture_source = helio_pass_sky::sky_texture::file_source(&hdri);
                     helio_pass_sky::sky_texture::set_requested(sky.sky_texture_source);
                     sky.sky_texture_intensity = 2.0;
                     sky.sky_texture_opacity = tod.hdri_opacity;
+                    // WATER_SKY_ROT="yaw,pitch,roll" (radians) re-orients it.
+                    if let Some(rot) = std::env::var("WATER_SKY_ROT")
+                        .ok()
+                        .map(|v| {
+                            v.split(',')
+                                .filter_map(|n| n.trim().parse::<f32>().ok())
+                                .collect::<Vec<_>>()
+                        })
+                        .filter(|v| v.len() == 3)
+                    {
+                        sky.sky_texture_yaw = rot[0];
+                        sky.sky_texture_pitch = rot[1];
+                        sky.sky_texture_roll = rot[2];
+                    }
                 }
             } else if tod.hdri_opacity > 0.0 && hdri.exists() {
-                sky.sky_texture_source = helio_pass_sky::sky_texture::custom_source(&hdri);
+                sky.sky_texture_source = helio_pass_sky::sky_texture::file_source(&hdri);
                 helio_pass_sky::sky_texture::set_requested(sky.sky_texture_source);
                 sky.sky_texture_intensity = 1.0;
                 sky.sky_texture_opacity = tod.hdri_opacity;

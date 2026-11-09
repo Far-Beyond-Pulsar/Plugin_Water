@@ -214,7 +214,7 @@ impl ApplicationHandler for App {
             if time_of_day == "sunset" {
                 if let Ok(hdri) = std::env::var("WATER_HDRI_PATH") {
                     sky.sky_texture_source =
-                        helio_pass_sky::sky_texture::custom_source(Path::new(&hdri));
+                        helio_pass_sky::sky_texture::file_source(Path::new(&hdri));
                     sky.sky_texture_intensity = 1.0;
                     sky.sky_texture_opacity = 0.8;
                 }

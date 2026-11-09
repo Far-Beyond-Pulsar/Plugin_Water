@@ -23,6 +23,8 @@ water_editor = { workspace = true, optional = true }
 # The engine seams the plugin registers into.
 engine_backend = { path = "../../../crates/core/engine_backend", default-features = false, features = ["render"] }
 pulsar_world_registry = { workspace = true }
+# Level-record migrations (`pulsar_class::records`): the retired fields.
+pulsar_class = { workspace = true }
 # The editor's extension points.
 ui_level_editor = { workspace = true, optional = true }
 
@@ -46,7 +48,8 @@ lights_component = { workspace = true }
 lights_plugin = { workspace = true }
 foliage_component = { workspace = true }
 foliage_plugin = { workspace = true }
-pulsar_physics = { workspace = true }
+# Bodies physics marks as pushing water (tests/scene_rows.rs).
+physics_plugin = { workspace = true }
 
 [lints]
 workspace = true
