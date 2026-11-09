@@ -19,14 +19,19 @@ draw phases and api crates.
 
 | Crate | Path | What |
 |---|---|---|
+| `water_plugin` | `./` | Water (`pulsar.water`): the plugin's root crate, the one place it registers everything it contributes (runtime registrations always, the editor's with `editor`) |
 | `helio-water-api` | `api/` | The water feature's public contract: the terrain elevation seam its shoreline bakes from. |
-| `water_component` | `component/` | Water (pulsar.water): the water volume component, its rows and the registrations of the plugin's Helio feature (the water simulation and draw) |
-| `water_plugin` | `editor/` | Water (pulsar.water): the editor plugin -- its metadata, over the plugin's component crate |
+| `water_component` | `component/` | Water (pulsar.water): the water volume component, its rows, its row join and the plugin's Helio feature set (the water simulation and draw); the plugin's root crate registers them |
+| `water_editor` | `editor/` | Water (pulsar.water): the editor crate -- the level editor's water entries, over the plugin's component crate |
 | `water-examples` | `examples/` | The water plugin's standalone hosts on Helio: the cathedral water and the oil rig at night |
 | `helio-pass-water-sim` | `feature/` | Helio feature: water simulation, lighting, caustics (the frame's transmission) and drawing |
 
-- **Runtime module** (what a game built for a project links): `water_component`.
-- **Editor module** (what the editor links in addition): `water_plugin`.
+- **Root crate**: `water_plugin`. It is the one place the plugin submits
+  its contributions (component classes, features, scene seams, settings,
+  editor tools), each naming it as origin, so the plugin gate and the
+  plugin catalog see all of them. The other crates submit none (only type
+  attachments, such as a component's GPU mirror, stay with their types). A
+  game links the root without its `editor` feature; the editor links it with.
 - **Requires**: nothing. A project enables or disables the plugin in its
   `Pulsar.toml` (`[plugins]`); disabled, the kind is absent and the frame
   draws without it.
@@ -44,8 +49,8 @@ only inside a Pulsar-Native checkout:
 ```bash
 git clone --recursive https://github.com/Far-Beyond-Pulsar/Pulsar-Native
 cd Pulsar-Native
-cargo check -p helio-water-api -p water_component -p water_plugin -p water-examples -p helio-pass-water-sim --tests
-cargo test -p helio-water-api -p water_component -p helio-pass-water-sim
+cargo check -p helio-water-api -p water_component -p water_plugin -p water_editor -p water-examples -p helio-pass-water-sim --tests
+cargo test -p helio-water-api -p water_plugin -p water_component -p helio-pass-water-sim
 ```
 
 Suites that render real frames need a GPU; CI leaves them out by name
