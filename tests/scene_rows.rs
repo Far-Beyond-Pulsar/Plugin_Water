@@ -7,6 +7,9 @@
 // The join harness is the engine's; not every test here uses every helper.
 #![allow(dead_code)]
 
+// The plugin as a game links it: its root, with every registration.
+use water_plugin as _;
+
 use std::sync::Arc;
 
 use engine_backend::scene::{SceneWorldExt, SpawnObject, Transform, Visibility, attachments};
@@ -15,7 +18,13 @@ use helio_scene_join::{
     BufferHandle, BufferKey, SceneBufferProjection, SceneDerivation, SceneDerivationContext,
 };
 use pulsar_scenedb::{Entity, SceneDb};
-use water_component::WaterVolumeComponent;
+use water_plugin::water_component::WaterVolumeComponent;
+
+// The kinds whose rows the water reads register their classes and joins
+// through their roots.
+use foliage_plugin as _;
+use lights_plugin as _;
+use meshes_plugin as _;
 
 fn device() -> Option<(Arc<wgpu::Device>, Arc<wgpu::Queue>)> {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());

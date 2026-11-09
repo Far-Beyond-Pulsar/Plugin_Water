@@ -8,20 +8,17 @@
 //!   the owner, writes the lights' directional light as its sun and the
 //!   level's wind over it, and bounds the bodies physics marks as pushing
 //!   water (`helio_pass_water_sim::scene_rows`).
-//! - The registrations of the plugin's Helio feature
-//!   (`helio_pass_water_sim::WaterFeature`: the simulation, the surface, and
-//!   the caustics published as the frame's transmission) and its scene rows
-//!   with the engine. Water simulates on the frame clock, so a realtime
-//!   viewport keeps drawing while a volume is enabled.
+//! - What the engine runs for them, each through a generic registration
+//!   (the engine names no water type): the plugin's Helio feature
+//!   ([`render_features`]: `helio_pass_water_sim::WaterFeature`, the
+//!   simulation, the surface, and the caustics published as the frame's
+//!   transmission), its scene rows ([`register_columns`], [`derivation`])
+//!   and its animated content ([`watch_water`], [`water_live`]: water
+//!   simulates on the frame clock, so a realtime viewport keeps drawing
+//!   while a volume is enabled).
 //!
-//! Everything registers through `inventory` once the crate is linked: hosts link it
-//! without naming it (a game built for a project links the runtime modules
-//! of the plugins its `Pulsar.toml` enables, the editor every installed
-//! plugin through `installed_plugins`; `pulsar_plugins`) and know no water type.
-
-// The plugin's descriptor (`../pulsar-plugin.toml`): linking this crate
-// installs the plugin; a project enables it or not (`pulsar_plugins`).
-pulsar_plugins::installed!("../pulsar-plugin.toml");
+//! This crate registers nothing itself: the plugin's root crate
+//! (`water_plugin`) submits every registration above, in one place.
 
 pub mod component;
 
@@ -106,11 +103,14 @@ pulsar_scenedb::pulsar_reflection::inventory::submit! {
     }
 }
 
-fn register_columns(store: &mut SceneGpuStore, device: &std::sync::Arc<wgpu::Device>) {
+/// Registers the volumes' source rows (the scene rows' columns).
+pub fn register_columns(store: &mut SceneGpuStore, device: &std::sync::Arc<wgpu::Device>) {
     WaterVolumeSourceRow::register_gpu_columns_growable(store, 8, device);
 }
 
-fn derivation(
+/// The plugin's row join: places the volumes, writes their sun and wind
+/// and bounds the water hitboxes (`helio_pass_water_sim::scene_rows`).
+pub fn derivation(
     device: &wgpu::Device,
     keys: helio_scene_join::RowJoinKeys,
 ) -> Box<dyn helio_scene_join::SceneDerivation> {
@@ -126,19 +126,11 @@ fn derivation(
     ))
 }
 
-inventory::submit! {
-    engine_backend::scene::helio_bridge::SceneRowsRegistration {
-        origin: pulsar_plugins::origin!(),
-        register_columns,
-        derivation,
-    }
-}
-
 /// Water simulates on the frame clock: its waves travel in a wind, and
 /// ripples from bodies moving through it (#1080) spread and settle over many
 /// frames after the edit that made them. Any enabled volume keeps a
 /// realtime viewport drawing.
-fn water_live(world: &pulsar_scenedb::World) -> bool {
+pub fn water_live(world: &pulsar_scenedb::World) -> bool {
     world
         .query::<&WaterVolumeComponent>()
         .any(|(instance, water)| {
@@ -146,29 +138,14 @@ fn water_live(world: &pulsar_scenedb::World) -> bool {
         })
 }
 
-fn watch_water(world: &pulsar_scenedb::World) -> pulsar_scenedb::ChangeCursor {
+/// The changes that can change [`water_live`]'s answer.
+pub fn watch_water(world: &pulsar_scenedb::World) -> pulsar_scenedb::ChangeCursor {
     world.open_change_cursor::<WaterVolumeComponent>()
 }
 
-inventory::submit! {
-    engine_backend::subsystems::render::AnimatedContentRegistration {
-        origin: pulsar_plugins::origin!(),
-        watch: watch_water,
-        animated: water_live,
-    }
-}
-
 /// Water's feature: the simulation, its draw and its transmission.
-fn render_features() -> helio_feature_api::FeatureSet {
+pub fn render_features() -> helio_feature_api::FeatureSet {
     helio_feature_api::FeatureSet::new().with(helio_pass_water_sim::WaterFeature)
-}
-
-inventory::submit! {
-    engine_backend::subsystems::render::RenderFeatureRegistration {
-        origin: pulsar_plugins::origin!(),
-        features: render_features,
-        configure: |config| config,
-    }
 }
 
 #[cfg(test)]
@@ -210,36 +187,5 @@ mod tests {
             &bytemuck::bytes_of(&water.local_gpu())[32..]
         );
         assert_eq!(row.size, [200.0, 60.0, 200.0, 2.5]);
-    }
-
-    #[test]
-    fn an_enabled_volume_animates() {
-        use pulsar_scene_model::{SpawnObject, world_ext::SceneWorldExt};
-        let mut world = pulsar_scenedb::World::new();
-        let object = world.spawn_object(SpawnObject::new("lake")).unwrap();
-        assert!(!water_live(&world));
-        let water = pulsar_world_registry::attach_value(
-            &mut world,
-            object,
-            WaterVolumeComponent::default(),
-        )
-        .unwrap();
-        assert!(water_live(&world), "an enabled water volume animates");
-        world
-            .get_mut::<WaterVolumeComponent>(water)
-            .unwrap()
-            .enabled = false;
-        assert!(!water_live(&world), "a disabled one does not");
-    }
-
-    #[test]
-    fn registers_its_feature() {
-        let features =
-            engine_backend::subsystems::render::helio_renderer::render_features::plugin_features();
-        assert!(
-            features.ids().contains(&"helio.water"),
-            "features: {:?}",
-            features.ids()
-        );
     }
 }

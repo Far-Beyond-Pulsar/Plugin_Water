@@ -25,7 +25,7 @@
 //! (`helio_water_api::WATER_HITBOX_SOURCES_BUFFER`), not from this
 //! component.
 
-use engine_class_derive::{engine_class, register_world_component};
+use engine_class_derive::{engine_class, world_component};
 use helio_pass_water_sim::GpuWaterVolume;
 
 pub const WATER_VOLUME_CLASS_NAME: &str = "WaterVolumeComponent";
@@ -309,20 +309,13 @@ impl WaterVolumeComponent {
     }
 }
 
-#[register_world_component]
+// The plugin's root crate registers the class (`submit_world_component!`).
+#[world_component]
 impl WaterVolumeComponent {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn registers_under_its_class_name() {
-        assert_eq!(
-            pulsar_world_registry::component_id_for_class(WATER_VOLUME_CLASS_NAME),
-            Some(pulsar_scenedb::component_id::<WaterVolumeComponent>())
-        );
-    }
 
     #[test]
     fn the_local_row_is_centred_on_the_owner() {
