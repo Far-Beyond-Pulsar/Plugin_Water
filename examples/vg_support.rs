@@ -71,20 +71,12 @@ impl Vg {
     pub fn new(cache: PathBuf) -> Self {
         let _ = std::fs::create_dir_all(&cache);
         let runtime = VgRuntime::default();
-        // Pre-rendered stills: every cluster is cut at the true screen-space error
-        // (tau). The screen-wide density budget (default two triangles per pixel)
-        // would raise tau for the whole view once distant crowds eat the budget,
-        // coarsening the near trees while the far ones cannot go below their roots.
-        let sensitivity = std::env::var("MUSKOKA_VG_SENSITIVITY")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0.0);
+        // Pre-rendered stills: every cluster is cut at the true screen-space error (tau).
         let tau = std::env::var("MUSKOKA_VG_TAU")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(0.5);
         runtime.set_settings(helio_vg_stream::VgRuntimeSettings {
-            selection_sensitivity: sensitivity,
             tau_px: tau,
             max_visible_clusters: 16_777_216,
             page_budget_mb: 4096,
