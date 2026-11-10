@@ -300,18 +300,6 @@ impl ApplicationHandler for App {
             row.star_count = 9000.0;
             row.star_brightness = 3.2;
             row.shooting_star_rate = 0.05;
-            // A night panorama (`WATER_HDRI_PATH`) under the procedural stars;
-            // none is built into the binary (`helio_pass_sky::sky_texture`).
-            if let Ok(hdri) = std::env::var("WATER_HDRI_PATH") {
-                row.sky_texture_source =
-                    helio_pass_sky::sky_texture::file_source(std::path::Path::new(&hdri));
-                helio_pass_sky::sky_texture::set_requested(row.sky_texture_source);
-                row.sky_texture_intensity = 2.0;
-                row.sky_texture_opacity = 1.0;
-                row.sky_texture_yaw = 3.0;
-                row.sky_texture_pitch = 0.3;
-                row.sky_texture_roll = 1.0;
-            }
         } else {
             row.night_sky_enabled = 0;
             row.shooting_stars_enabled = 0;
