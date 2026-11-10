@@ -1,0 +1,105 @@
+# The water plugin's rows of the SceneDB closure ledger (Pulsar-Native#1035):
+# its classes, GPU schemas, buffers, pass crates and call sites. A plugin owns
+# the rows of what it ships (Pulsar-Native#1606); `cargo test -p scene_inventory`
+# in a Pulsar-Native checkout recomputes every fact column, checks the human
+# columns, and fails on a missing, stale or misplaced row. The columns are
+# described in Pulsar-Native's crates/core/scene_inventory/ledger.toml.
+
+# ── Exposed component classes ───────────────────────────────────
+
+[[class]]
+name = "WaterVolumeComponent"
+category = "Rendering"
+world_registered = true
+own_gpu_columns = true
+owner = "water_component::component"
+disposition = "render, Phase 4. Its derived source row is written on every insert, write, removal and replay; the environment join gates, places and packs it into water_volumes, which water simulation, surface, caustics and deferred lighting read. The simulation reads each volume's own spring, damping, wave scale, wave speed and wind from its row and steps on the renderer's frame clock (#1065); the wind is the level's global wind unless the volume opts out (use_global_wind), and the sun is the lights' directional light, written into the row by the join (the authored sun_direction is retired by a load migration)"
+target_contract = "Phase 4; 09-component-structure-and-graph-boundary.md"
+test = "plugins/vendor/water/tests/scene_rows.rs (water_volumes_are_packed_into_the_leading_rows, water_takes_the_scenes_sun_and_the_global_wind); plugins/installed/tests/render_acceptance.rs (environment_components_reach_the_frame, water_volumes_simulate_with_their_own_dynamics_on_the_frame_clock)"
+status = "verified"
+
+# ── GPU-bearing schemas ─────────────────────────────────────────
+
+[[schema]]
+type = "WaterVolumeSourceRow"
+path = "water_component::WaterVolumeSourceRow"
+buffers = ["water_volume_sources"]
+clears_on_remove = true
+releases_var_len = false
+registered = true
+writer = "WaterVolumeComponent's derived GPU registration (local size and surface offset, then the water row after its bounds; zero when disabled), on every insert, write, removal and replay"
+owner = "water_component"
+disposition = "keep: the environment join's water_volumes input (Phase 4)"
+target_contract = "Phase 4; 09-component-structure-and-graph-boundary.md"
+test = "plugins/vendor/water/tests/scene_rows.rs"
+status = "verified"
+
+[[schema]]
+type = "WaterVolumeComponent"
+path = "water_component::component::WaterVolumeComponent"
+buffers = ["water_volumes"]
+clears_on_remove = true
+releases_var_len = false
+registered = false
+writer = "SceneDB write path of the authored value itself, through its derived WaterVolumeSourceRow registration (Phase 4)"
+owner = "water_component::component"
+disposition = "keep: the authored type's GPU dispatch is the derived source row; the scanner attributes water_volumes to it by name, but the row it writes is water_volume_sources"
+target_contract = "Phase 4; 09-component-structure-and-graph-boundary.md"
+test = "plugins/vendor/water/tests/scene_rows.rs"
+status = "verified"
+
+# ── GPU buffer keys ─────────────────────────────────────────────
+
+[[buffer]]
+key = "water_volumes"
+producers = ["WaterVolumeComponent"]
+consumers = ["helio-pass-water-sim"]
+owner = "helio-scene-derivations environment join (execution output, placed volumes packed into MAX_WATER_VOLUMES leading rows in instance order)"
+disposition = "keep: the water passes read a fixed number of leading rows (deferred lighting reads row 0), so the join packs placed volumes rather than keeping the instance row"
+target_contract = "Phase 4; 09-component-structure-and-graph-boundary.md"
+test = "plugins/vendor/water/tests/scene_rows.rs; plugins/installed/tests/render_acceptance.rs (environment_components_reach_the_frame)"
+status = "verified"
+
+[[buffer]]
+key = "water_volume_sources"
+producers = ["WaterVolumeSourceRow"]
+consumers = []
+owner = "helio_component::components::environment_rows"
+disposition = "keep: WaterVolumeComponent in its owner's space, derived on every write; the environment join packs it into water_volumes"
+target_contract = "Phase 4; 09-component-structure-and-graph-boundary.md"
+test = "plugins/vendor/water/tests/scene_rows.rs"
+status = "verified"
+
+# ── Render pass crates ──────────────────────────────────────────
+
+[[pass]]
+crate = "helio-pass-water-sim"
+in_default_graph = false
+reads = ["water_hitboxes", "water_volumes"]
+owner = "helio-presets (mapping); helio-pass-water-sim (algorithm)"
+disposition = "keep: reads water_volumes (joined from WaterVolumeComponent, Phase 4) and water_hitboxes (joined from PhysicsComponents on the WaterSim channel, #1080)"
+target_contract = "Phase 6; 03-gpu-reflection-and-rendering.md"
+test = "plugins/vendor/water/tests/scene_rows.rs; plugins/installed/tests/render_acceptance.rs (every_pass_of_the_editor_graph_runs)"
+status = "verified"
+
+# ── Lifecycle call sites ────────────────────────────────────────
+
+[[site]]
+pattern = "change-cursor"
+file = "plugins/vendor/water/component/src/lib.rs"
+count = 1
+owner = "plugins/vendor/water/component/src/lib.rs"
+disposition = "keep: the kind's own, moved with it into its plugin (plugin-migration.md Phases B and C)"
+target_contract = "Phase C; plugin-migration.md"
+test = "none: no test names this row; the owning plugin's suites cover its behaviour"
+status = "unverified"
+
+[[buffer]]
+key = "water_hitboxes"
+producers = ["WaterHitboxComponent"]
+consumers = ["helio-pass-water-sim"]
+owner = "helio-scene-derivations environment join (execution output)"
+disposition = "keep: bodies on the WaterSim collision channel, joined on the GPU from water_hitbox_sources, the owner transform and its meshes' bounds and packed into the simulation's fixed rows; the simulation keeps each body's previous bounds itself (#1080)"
+target_contract = "Phase 4; 09-component-structure-and-graph-boundary.md"
+test = "plugins/installed/tests/render_acceptance.rs (bodies_on_the_water_sim_channel_push_the_water); plugins/vendor/water/tests/scene_rows.rs (bodies_on_the_water_sim_channel_become_water_hitboxes)"
+status = "verified"

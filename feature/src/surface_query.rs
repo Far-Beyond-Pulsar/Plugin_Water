@@ -58,7 +58,7 @@ pub struct WaterSurfaceQueryResult {
 }
 
 /// Host-side adapter point for the engine's physics runtime. The Helio pass
-/// intentionally does not depend on `pulsar_physics`; an adapter converts the
+/// intentionally does not depend on the physics plugin; an adapter converts the
 /// results into that crate's public sample contract and publishes its mailbox.
 pub trait WaterSurfaceQueryConsumer {
     fn publish_water_surface_queries(
