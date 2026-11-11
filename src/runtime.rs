@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn an_enabled_volume_animates() {
-        use pulsar_scene_model::{SpawnObject, world_ext::SceneWorldExt};
+        use pulsar_scene_model::{world_ext::SceneWorldExt, SpawnObject};
         let mut world = pulsar_scenedb::World::new();
         let object = world.spawn_object(SpawnObject::new("lake")).unwrap();
         assert!(!water_component::water_live(&world));
@@ -114,10 +114,9 @@ mod tests {
             .into_iter()
             .filter(|summary| summary.origin == pulsar_plugins::origin!())
             .collect();
-        assert!(
-            ours.iter()
-                .any(|summary| summary.category == "component.class")
-        );
+        assert!(ours
+            .iter()
+            .any(|summary| summary.category == "component.class"));
         for summary in &ours {
             assert_eq!(
                 pulsar_plugins::plugin_of(summary.origin).map(|plugin| plugin.id.as_str()),

@@ -35,7 +35,6 @@ pub use surface_query::{
 };
 pub use transmission::WaterTransmissionPass;
 
-
 /// Simple fullscreen blit: copies a texture to the render target as-is.
 const BLIT_WGSL: &str = "
 @group(0) @binding(0) var blit_tex:  texture_2d<f32>;
@@ -1016,11 +1015,7 @@ impl RenderPass for WaterSimPass {
         ctx: &PrepareContext,
         demands: &mut helio_core::FrameDemands,
     ) {
-        if ctx
-            .scene_buffers
-            .get(WATER_VOLUMES.key())
-            .is_some()
-        {
+        if ctx.scene_buffers.get(WATER_VOLUMES.key()).is_some() {
             demands.demand(helio_frame_api::depth::HIZ_NEAREST);
         }
     }

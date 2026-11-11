@@ -75,7 +75,7 @@ status = "verified"
 [[pass]]
 crate = "helio-pass-water-sim"
 in_default_graph = false
-reads = ["water_hitboxes", "water_volumes"]
+reads = ["directional_lights", "scene_lights", "view_remaps", "water_hitboxes", "water_volumes"]
 owner = "helio-presets (mapping); helio-pass-water-sim (algorithm)"
 disposition = "keep: reads water_volumes (joined from WaterVolumeComponent, Phase 4) and water_hitboxes (joined from PhysicsComponents on the WaterSim channel, #1080)"
 target_contract = "Phase 6; 03-gpu-reflection-and-rendering.md"
