@@ -35,8 +35,6 @@ pub use surface_query::{
 };
 pub use transmission::WaterTransmissionPass;
 
-use pulsar_scenedb::gpu::BufferKey;
-
 /// Simple fullscreen blit: copies a texture to the render target as-is.
 const BLIT_WGSL: &str = "
 @group(0) @binding(0) var blit_tex:  texture_2d<f32>;
@@ -831,11 +829,12 @@ impl WaterSimPass {
 
 impl RenderPass for WaterSimPass {
     fn scene_buffers(&self) -> &'static [&'static str] {
-        &[
-            "water_hitboxes",
-            "water_volumes",
-            helio_light_api::LIGHT_LIST,
-        ]
+        const LIST: &[&str] = &[
+            WATER_HITBOXES.name(),
+            WATER_VOLUMES.name(),
+            helio_light_api::SCENE_LIGHTS.name(),
+        ];
+        LIST
     }
 
     fn name(&self) -> &'static str {
@@ -844,7 +843,7 @@ impl RenderPass for WaterSimPass {
 
     /// A member while the scene has water: some `"water_volumes"` row is live.
     fn is_member(&mut self, scene: &mut helio_core::SceneContent<'_>) -> bool {
-        scene.holds_rows("water_volumes")
+        scene.holds_rows(WATER_VOLUMES.name())
     }
 
     fn on_leave(&mut self, device: &wgpu::Device) {
@@ -1016,11 +1015,7 @@ impl RenderPass for WaterSimPass {
         ctx: &PrepareContext,
         demands: &mut helio_core::FrameDemands,
     ) {
-        if ctx
-            .scene_buffers
-            .get(BufferKey::of("water_volumes"))
-            .is_some()
-        {
+        if ctx.scene_buffers.get(WATER_VOLUMES.key()).is_some() {
             demands.demand(helio_frame_api::depth::HIZ_NEAREST);
         }
     }
@@ -1251,11 +1246,11 @@ impl RenderPass for WaterSimPass {
         // `strength == 0` short-circuit).
         let water_volumes_buf = ctx
             .scene_buffers
-            .get(BufferKey::of("water_volumes"))
+            .get(WATER_VOLUMES.key())
             .map(|handle| &handle.buffer);
         let water_hitboxes_buf = ctx
             .scene_buffers
-            .get(BufferKey::of("water_hitboxes"))
+            .get(WATER_HITBOXES.key())
             .map(|handle| &handle.buffer);
         // The pass runs only while some row is live (`is_member`); empty rows
         // are inert everywhere (no surface, no caustics, no tint). A volume
@@ -1996,7 +1991,7 @@ impl RenderPass for WaterSimPass {
 
                 let lights_buf = ctx
                     .scene_buffers
-                    .get(BufferKey::of(helio_light_api::LIGHT_LIST))
+                    .get(helio_light_api::SCENE_LIGHTS.key())
                     .map(|handle| &handle.buffer)
                     .unwrap_or(&self.fallback_lights);
 

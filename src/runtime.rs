@@ -2,45 +2,59 @@
 //! runtime contribution, grouped by the engine seam it plugs into.
 
 use engine_backend::scene::helio_bridge::SceneRowsRegistration;
+use engine_backend::scene::{ClassSpec, ComponentsBuilder};
 use engine_backend::subsystems::render::{AnimatedContentRegistration, RenderFeatureRegistration};
 use water_component::WaterVolumeComponent;
 
-// ── Component classes ───────────────────────────────────────────────────────
+/// Everything the water plugin registers for a game.
+pub(crate) fn build(p: &mut pulsar_plugins::PluginBuilder) {
+    // ── Component classes ───────────────────────────────────────────────────
 
-pulsar_world_registry::submit_world_component!(WaterVolumeComponent);
+    p.components()
+        .class::<WaterVolumeComponent>(ClassSpec::default());
 
-// ── Rendering ───────────────────────────────────────────────────────────────
+    // ── Rendering ───────────────────────────────────────────────────────────
 
-// The water feature: the simulation, its draw and the caustics published as
-// the frame's transmission.
-inventory::submit! {
-    RenderFeatureRegistration {
-        origin: pulsar_plugins::origin!(),
+    // The water feature: the simulation, its draw and the caustics published
+    // as the frame's transmission.
+    p.add(RenderFeatureRegistration {
+        origin: p.origin(),
         features: water_component::render_features,
         configure: |config| config,
-    }
-}
+    });
 
-// The volumes' source rows and the row join that places them, writes their
-// sun and wind and bounds the water hitboxes.
-inventory::submit! {
-    SceneRowsRegistration {
-        origin: pulsar_plugins::origin!(),
+    // The volumes' source rows and the row join that places them, writes
+    // their sun and wind and bounds the water hitboxes.
+    p.add(SceneRowsRegistration {
+        origin: p.origin(),
         name: "water.volumes",
         register_columns: water_component::register_columns,
         derivation: Some(water_component::derivation),
-    }
-}
+    });
 
-// Water simulates on the frame clock: any enabled volume keeps a realtime
-// viewport drawing.
-inventory::submit! {
-    AnimatedContentRegistration {
-        origin: pulsar_plugins::origin!(),
+    // Water simulates on the frame clock: any enabled volume keeps a realtime
+    // viewport drawing.
+    p.add(AnimatedContentRegistration {
+        origin: p.origin(),
         name: "water.volumes",
         watch: water_component::watch_water,
         animated: water_component::water_live,
-    }
+    });
+
+    // ── Records ─────────────────────────────────────────────────────────────
+
+    // A water volume takes its sun from the level's directional light
+    // (#1065): the `sun_direction` levels saved before that is dropped on
+    // load.
+    p.add(pulsar_class::records::RecordMigrationRegistration {
+        origin: p.origin(),
+        name: "water.retired_fields",
+        description: "removed the water volume's retired sun_direction",
+        entries: None,
+        from_props: None,
+        stale_props: &[],
+        retired_fields: &[("WaterVolumeComponent", "sun_direction")],
+    });
 }
 
 #[cfg(test)]
@@ -111,21 +125,5 @@ mod tests {
                 "{summary:?}"
             );
         }
-    }
-}
-
-// ── Records ──
-
-// A water volume takes its sun from the level's directional light (#1065):
-// the `sun_direction` levels saved before that is dropped on load.
-inventory::submit! {
-    pulsar_class::records::RecordMigrationRegistration {
-        origin: pulsar_plugins::origin!(),
-        name: "water.retired_fields",
-        description: "removed the water volume's retired sun_direction",
-        entries: None,
-        from_props: None,
-        stale_props: &[],
-        retired_fields: &[("WaterVolumeComponent", "sun_direction")],
     }
 }

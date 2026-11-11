@@ -19,6 +19,10 @@ impl Feature for WaterFeature {
     }
 
     fn register(&self, registrar: &mut FeatureRegistrar<'_>) {
+        registrar.consumes(crate::WATER_VOLUMES);
+        registrar.consumes(crate::WATER_HITBOXES);
+        registrar.consumes(helio_light_api::SCENE_LIGHTS);
+        registrar.consumes(helio_light_api::DIRECTIONAL_LIGHTS_ROW);
         // What shader hot reload may swap without rebuilding the graph.
         registrar.swappable::<WaterSimPass>();
         registrar.swappable::<WaterTransmissionPass>();

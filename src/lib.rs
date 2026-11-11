@@ -6,7 +6,7 @@
 //! simulation, lighting, caustics and draw), `water_component` (the water
 //! volume component, its rows and its row join) and `water_editor` (the
 //! level editor's water entries). None of them registers a contribution;
-//! this crate imports them and submits their registrations, so this file and
+//! this crate imports them and registers their registrations, so this file and
 //! the two modules below are the whole list of what the plugin brings:
 //!
 //! - [`runtime`]: what a game links. The component class, the Helio feature,
@@ -24,7 +24,7 @@
 
 // The plugin's descriptor (`pulsar-plugin.toml`): linking this crate installs
 // the plugin; a project enables it or not (`pulsar_plugins`).
-pulsar_plugins::installed!("pulsar-plugin.toml");
+pulsar_plugins::installed!("pulsar-plugin.toml", build);
 
 pub use water_component;
 #[cfg(feature = "editor")]
@@ -34,3 +34,11 @@ pub mod runtime;
 
 #[cfg(feature = "editor")]
 pub mod editor;
+
+/// Everything the plugin registers (runtime always, editor with the `editor`
+/// feature), through the builder the kernel hands the plugin's root.
+pub fn build(p: &mut pulsar_plugins::PluginBuilder) {
+    runtime::build(p);
+    #[cfg(feature = "editor")]
+    editor::build(p);
+}

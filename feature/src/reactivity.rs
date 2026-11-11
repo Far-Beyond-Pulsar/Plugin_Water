@@ -104,7 +104,7 @@ impl RenderPass for WaterReactivityPass {
 
     /// A member while the scene has water, like the simulation.
     fn is_member(&mut self, scene: &mut helio_core::SceneContent<'_>) -> bool {
-        scene.holds_rows("water_volumes")
+        scene.holds_rows(crate::WATER_VOLUMES.name())
     }
 
     fn reads(&self) -> &'static [&'static str] {

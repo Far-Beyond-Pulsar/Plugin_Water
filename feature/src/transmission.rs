@@ -168,12 +168,13 @@ impl RenderPass for WaterTransmissionPass {
     }
 
     fn scene_buffers(&self) -> &'static [&'static str] {
-        &["water_volumes", VIEW_REMAPS]
+        const LIST: &[&str] = &[crate::WATER_VOLUMES.name(), VIEW_REMAPS];
+        LIST
     }
 
     /// A member while the scene has water, like the simulation.
     fn is_member(&mut self, scene: &mut helio_core::SceneContent<'_>) -> bool {
-        scene.holds_rows("water_volumes")
+        scene.holds_rows(crate::WATER_VOLUMES.name())
     }
 
     fn reads(&self) -> &'static [&'static str] {
@@ -237,7 +238,7 @@ impl RenderPass for WaterTransmissionPass {
     fn execute(&mut self, ctx: &mut PassContext) -> HelioResult<()> {
         let Some(volumes) = ctx
             .scene_buffers
-            .get(BufferKey::of("water_volumes"))
+            .get(crate::WATER_VOLUMES.key())
             .map(|handle| handle.buffer.clone())
         else {
             return Ok(());

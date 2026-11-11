@@ -29,7 +29,7 @@ pub use helio_water_api::{WATER_HITBOX_GATE_WORD, WATER_HITBOX_SOURCE_ROW_BYTES}
 /// A volume: its surface height, sun and world phase (`rows_volumes.wgsl`), with
 /// the sun the lights' directional light.
 const VOLUMES_PLACEMENT: Placement = Placement::new(
-    "water_volumes",
+    crate::WATER_VOLUMES.name(),
     include_str!("../shaders/rows_volumes.wgsl"),
 )
 .from_owner()
@@ -39,14 +39,14 @@ const WIND_PLACEMENT: Placement =
     Placement::new("water_wind", include_str!("../shaders/rows_wind.wgsl"));
 /// A hitbox bounded by the meshes its owner holds (`rows_hitboxes.wgsl`).
 const HITBOXES_PLACEMENT: Placement = Placement::new(
-    "water_hitboxes",
+    crate::WATER_HITBOXES.name(),
     include_str!("../shaders/rows_hitboxes.wgsl"),
 )
 .from_owner()
 .owner_bounded();
 
-pub const WATER_VOLUMES_KEY: BufferKey = BufferKey::of("water_volumes");
-pub const WATER_HITBOXES_KEY: BufferKey = BufferKey::of("water_hitboxes");
+pub const WATER_VOLUMES_KEY: BufferKey = crate::WATER_VOLUMES.key();
+pub const WATER_HITBOXES_KEY: BufferKey = crate::WATER_HITBOXES.key();
 
 /// Where water's source rows live.
 #[derive(Clone, Copy, Debug)]
@@ -61,7 +61,7 @@ pub struct WaterRowSources {
 /// the host's keys say.
 pub fn scene_rows(device: &wgpu::Device, keys: RowJoinKeys, sources: WaterRowSources) -> RowJoin {
     let keys = RowJoinKeys {
-        directional_light: Some(BufferKey::of(helio_light_api::DIRECTIONAL_LIGHTS)),
+        directional_light: Some(helio_light_api::DIRECTIONAL_LIGHTS_ROW.key()),
         ..keys
     };
     RowJoin::new(
