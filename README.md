@@ -39,6 +39,16 @@ draw phases and api crates.
 - **Its standalone hosts also compose**: `helio-pass-volumetric-fog` (fog); `helio-pass-gi` (gi); `helio-pass-flare, helio-pass-lens` (lens); `helio-light-api, helio-light-host` (lights); `helio-mats` (materials); `helio-asset-compat, helio-mesh-api, helio-mesh-host, helio-pass-forward-lit, helio-pass-vg, helio-vg-build, helio-vg-format, helio-vg-stream` (meshes); `helio-pass-sky` (sky) (demos and GPU tests
   draw a whole scene; the plugin itself does not depend on these).
 
+## Render graph nodes
+
+Every pass the plugin's feature adds to the default pipeline is a node of `.rendergraph` assets, registered from its feature (`registrar.node`, so only while the plugin is enabled) with generated pins, an `Enabled` parameter and the default placement below. A graph naming one while `pulsar.water` is disabled fails validation with the plugin named. Test: `tests/graph_node.rs`; see Pulsar-Native's `.agents/RENDER_GRAPH.md` ("Plugin nodes").
+
+| Node kind | Title | Default placement |
+|---|---|---|
+| `helio.pass.water_transmission` | Water: Caustics | Lighting-inputs slot, order 20 (builds nothing where lighting runs before the inputs) |
+| `helio.pass.water_sim` | Water: Simulate + Draw | Overlay phase drawer, order 30 |
+| `helio.pass.water_reactivity` | Water: TSR Reactivity | Transparent phase drawer, order 50 (builds nothing without a reactive mask) |
+
 ## Building and testing
 
 Like [Plugin_Physics](https://github.com/Far-Beyond-Pulsar/Plugin_Physics), this plugin's crates are members

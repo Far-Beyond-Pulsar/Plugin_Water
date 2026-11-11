@@ -49,6 +49,9 @@ foliage_component = { workspace = true }
 foliage_plugin = { workspace = true }
 # Bodies physics marks as pushing water (tests/scene_rows.rs).
 physics_plugin = { workspace = true }
+# The render graph node tests (`tests/graph_node.rs`).
+helio-graph-asset = { workspace = true }
+helio-presets = { workspace = true }
 
 [lints]
 workspace = true
