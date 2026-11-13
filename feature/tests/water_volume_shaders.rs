@@ -22,7 +22,7 @@ fn validate(name: &str, text: &str, snippets: &[helio_core::shader::ShaderSnippe
 
 #[test]
 fn the_water_shaders_validate_with_the_volume_row() {
-    let atmosphere = helio_frame_api::lighting::sky::ATMOSPHERE_SNIPPET;
+    let atmosphere = helio_frame_api::lighting::sky::SKY_SNIPPET;
     let hiz = helio_pass_hiz::HIZ_SNIPPET;
     let volume_only = [WATER_VOLUME_SNIPPET];
     for (name, text) in [

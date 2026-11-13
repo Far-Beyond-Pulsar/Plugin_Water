@@ -855,7 +855,7 @@ impl WaterSimPass {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: wgpu::BufferSize::new(
-                            helio_frame_api::lighting::sky::ATMOSPHERE_FRAME_BYTES,
+                            helio_frame_api::lighting::sky::SKY_FRAME_BYTES,
                         ),
                     },
                     count: None,
@@ -867,7 +867,7 @@ impl WaterSimPass {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: wgpu::BufferSize::new(
-                            helio_frame_api::lighting::sky::ATMOSPHERE_SKY_TABLE_BYTES,
+                            helio_frame_api::lighting::sky::SKY_TABLE_BYTES,
                         ),
                     },
                     count: None,
@@ -907,13 +907,13 @@ impl WaterSimPass {
         });
         let fallback_atmosphere = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Water No Atmosphere"),
-            size: helio_frame_api::lighting::sky::ATMOSPHERE_FRAME_BYTES,
+            size: helio_frame_api::lighting::sky::SKY_FRAME_BYTES,
             usage: wgpu::BufferUsages::UNIFORM,
             mapped_at_creation: false,
         });
         let fallback_sky_table = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Water No Sky Table"),
-            size: helio_frame_api::lighting::sky::ATMOSPHERE_SKY_TABLE_BYTES,
+            size: helio_frame_api::lighting::sky::SKY_TABLE_BYTES,
             usage: wgpu::BufferUsages::UNIFORM,
             mapped_at_creation: false,
         });
@@ -1177,10 +1177,7 @@ impl WaterSimPass {
                     uniform_buffer_entry(16, 32),
                     // The atmosphere frame and sky-view LUT: the medium is
                     // lit by the same sky as the surface underside.
-                    uniform_buffer_entry(
-                        20,
-                        helio_frame_api::lighting::sky::ATMOSPHERE_FRAME_BYTES,
-                    ),
+                    uniform_buffer_entry(20, helio_frame_api::lighting::sky::SKY_FRAME_BYTES),
                     texture_entry(
                         21,
                         wgpu::TextureSampleType::Float { filterable: true },
@@ -1195,7 +1192,7 @@ impl WaterSimPass {
             &[
                 crate::WATER_VOLUME_SNIPPET,
                 WATER_SHORE_SNIPPET,
-                helio_frame_api::lighting::sky::ATMOSPHERE_SNIPPET,
+                helio_frame_api::lighting::sky::SKY_SNIPPET,
                 WATER_SKY_SNIPPET,
             ],
         );
@@ -1338,7 +1335,7 @@ impl WaterSimPass {
                 crate::WATER_VOLUME_SNIPPET,
                 helio_pass_hiz::HIZ_SNIPPET,
                 WATER_SHORE_SNIPPET,
-                helio_frame_api::lighting::sky::ATMOSPHERE_SNIPPET,
+                helio_frame_api::lighting::sky::SKY_SNIPPET,
                 WATER_SKY_SNIPPET,
                 WATER_LIGHTS_SNIPPET,
                 helio_light_api::LIGHT_LIST_SNIPPET,

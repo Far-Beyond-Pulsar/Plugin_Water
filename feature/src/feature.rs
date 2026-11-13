@@ -26,12 +26,6 @@ impl Feature for WaterFeature {
         // What shader hot reload may swap without rebuilding the graph.
         registrar.swappable::<WaterSimPass>();
         registrar.swappable::<WaterTransmissionPass>();
-        // The sea is animated shading with no motion vectors, so TSR needs its
-        // reactivity mask: ask the preset for it (the transparent pass writes
-        // it, `WaterReactivityPass` adds the water, the resolve reads it).
-        registrar.prepare(std::sync::Arc::new(|env| {
-            env.insert_setting(helio_frame_api::color::ReactiveMask);
-        }));
         registrar.node(
             pass_node(
                 "water_transmission",
@@ -75,18 +69,26 @@ impl Feature for WaterFeature {
                 "water_reactivity",
                 "Water: TSR Reactivity",
                 "Passes: Post",
-                "Tells TSR where the water is, so it drops history there instead of                  reprojecting animated waves along the sea floor's velocity. Builds                  nothing unless the frame has a reactive mask (TSR).",
+                "Tells TSR where the water is, so it drops history there instead of                  reprojecting animated waves along the sea floor's velocity. Builds                  nothing unless the frame resolves temporally; runs only while the                  scene holds water.",
                 |build| {
-                    // After the transparent pass, which clears and first writes
-                    // the mask; without one there is nothing to add to.
+                    // The sea is animated shading with no motion vectors, so a
+                    // temporal resolve needs to know where it is. After the
+                    // transparent drawers, which clear and first write the
+                    // mask where the lighting model leaves transparency to the
+                    // resolve; otherwise this pass is the mask's first writer.
                     if build
                         .env
-                        .setting::<helio_frame_api::color::ReactiveMask>()
+                        .setting::<helio_frame_api::color::TemporalResolve>()
                         .is_some()
                     {
-                        build
-                            .graph
-                            .add_pass(Box::new(WaterReactivityPass::new(build.env.device)));
+                        let first = build
+                            .env
+                            .setting::<helio_frame_api::color::ReactiveMask>()
+                            .is_none();
+                        build.graph.add_pass(Box::new(WaterReactivityPass::new(
+                            build.env.device,
+                            first,
+                        )));
                     }
                     Ok(())
                 },
