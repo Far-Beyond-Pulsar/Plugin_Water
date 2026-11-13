@@ -9,25 +9,35 @@
 //!
 //! Reads the surface depth `WaterSimPass` publishes as
 //! [`WATER_SURFACE_DEPTH`]; a pixel the surface draw wrote is water.
+//!
+//! A member only while the scene holds water, so a frame without water has
+//! no mask from it (the resolve then does no coverage work). Where the
+//! transparent drawers write the mask too (`color::ReactiveMask`) they clear
+//! it first and this pass adds to it; otherwise this pass allocates and
+//! clears it.
 
+use helio_core::graph::{ResourceBuilder, ResourceSize};
 use helio_core::{PassContext, RenderPass, ResourceKey, Result as HelioResult};
 
 /// Graph key of the water surface's own depth ([`crate::WaterSimPass`] writes
 /// it): non-zero (reverse-Z) where the surface drew this frame.
 pub const WATER_SURFACE_DEPTH: &str = "water_surface_depth";
 
-/// The mask TSR reads (`helio_frame_api::color::ReactiveMask` turns it on).
+/// The frame's reactive mask, which the temporal resolve reads.
 const MASK: &str = helio_frame_api::color::REACTIVE_MASK;
 
 /// Raises `transparency_reactivity` where the water surface is.
 pub struct WaterReactivityPass {
+    /// The frame's first writer of the mask: allocates and clears it.
+    first: bool,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     group: Option<(wgpu::TextureView, wgpu::BindGroup)>,
 }
 
 impl WaterReactivityPass {
-    pub fn new(device: &wgpu::Device) -> Self {
+    /// `first`: no earlier drawer of the frame writes the mask.
+    pub fn new(device: &wgpu::Device, first: bool) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Water reactivity"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -90,6 +100,7 @@ impl WaterReactivityPass {
             },
         );
         Self {
+            first,
             pipeline,
             layout,
             group: None,
@@ -108,11 +119,25 @@ impl RenderPass for WaterReactivityPass {
     }
 
     fn reads(&self) -> &'static [&'static str] {
-        &[MASK]
+        if self.first {
+            &[]
+        } else {
+            &[MASK]
+        }
     }
 
     fn writes(&self) -> &'static [&'static str] {
         &[MASK]
+    }
+
+    fn declare_resources(&self, builder: &mut ResourceBuilder) {
+        if self.first {
+            builder.write_color_raw(
+                MASK,
+                wgpu::TextureFormat::R8Unorm,
+                ResourceSize::MatchSurface,
+            );
+        }
     }
 
     fn render_pass_descriptor_with_storage<'a>(
@@ -129,7 +154,11 @@ impl RenderPass for WaterReactivityPass {
                 resolve_target: None,
                 depth_slice: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
+                    load: if self.first {
+                        wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
+                    } else {
+                        wgpu::LoadOp::Load
+                    },
                     store: wgpu::StoreOp::Store,
                 },
             })]));

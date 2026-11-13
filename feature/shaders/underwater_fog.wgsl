@@ -1,7 +1,7 @@
 //!use helio_prelude
 //!use water_volume
 //!use water_shore_surface
-//!use atmosphere
+//!use frame_sky
 //!use water_sky
 //
 // Underwater participating medium.
@@ -41,7 +41,7 @@ struct OceanPhase { patches: array<vec4f, 4> }
 @group(0) @binding(10) var<uniform> ocean_phase: OceanPhase;
 @group(0) @binding(11) var shafts_tex: texture_2d<f32>;
 const UNDER_SCATTERING: f32 = 0.03;  // UnderwaterPass params.scattering (1/m)
-@group(0) @binding(20) var<uniform> atmosphere: AtmosphereFrame;
+@group(0) @binding(20) var<uniform> sky_frame: SkyFrame;
 @group(0) @binding(21) var sky_view_lut: texture_2d<f32>;
 fn water_sky_lut(uv: vec2f) -> vec3f {
     return textureSampleLevel(sky_view_lut, scene_samp, uv, 0.0).rgb;

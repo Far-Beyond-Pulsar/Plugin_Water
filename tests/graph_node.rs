@@ -53,11 +53,9 @@ const CASES: &[Case] = &[Case {
         "helio.pass.water_sim",
         "helio.pass.water_reactivity",
     ],
-    passes: &[
-        "WaterTransmissionPass",
-        "WaterSimPass",
-        "WaterReactivityPass",
-    ],
+    // The reactivity pass builds only when the frame resolves temporally,
+    // which the default config does not.
+    passes: &["WaterTransmissionPass", "WaterSimPass"],
 }];
 
 /// The plugin gate is process-wide state and a wgpu device is one at a time

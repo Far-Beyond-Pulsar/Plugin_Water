@@ -21,11 +21,11 @@ fn local_lights_illuminate_water_without_a_sun() {
         // shader composes them.
         let source = r#"//!use helio_prelude
 //!use light_list
-//!use atmosphere
+//!use frame_sky
 //!use water_lights
 @group(0) @binding(0) var<storage, read> water_lights: array<GpuLight>;
 @group(0) @binding(1) var<storage, read_write> output: array<vec4f, 2>;
-@group(0) @binding(2) var<uniform> atmosphere: AtmosphereFrame;
+@group(0) @binding(2) var<uniform> sky_frame: SkyFrame;
 @compute @workgroup_size(1)
 fn main() {
     // The primary sun straight up: a directional light along it is the
@@ -42,13 +42,13 @@ fn main() {
             source,
             &[
                 helio_light_api::LIGHT_LIST_SNIPPET,
-                helio_frame_api::lighting::sky::ATMOSPHERE_SNIPPET,
+                helio_frame_api::lighting::sky::SKY_SNIPPET,
                 helio_pass_water_sim::pipeline::WATER_LIGHTS_SNIPPET,
             ],
         );
         let atmosphere = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: helio_frame_api::lighting::sky::ATMOSPHERE_FRAME_BYTES,
+            size: helio_frame_api::lighting::sky::SKY_FRAME_BYTES,
             mapped_at_creation: false,
             usage: wgpu::BufferUsages::UNIFORM,
         });

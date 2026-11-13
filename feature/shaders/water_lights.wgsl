@@ -26,7 +26,7 @@ fn water_local_lighting(
         if light.light_type == LIGHT_DIRECTIONAL {
             // The atmospheric surface path handles every directional light
             // together. Keep this fallback for water scenes without sky.
-            if atmosphere.planet.w >= 0.5 { continue; }
+            if sky_frame.planet.w >= 0.5 { continue; }
             l = -normalize(light.direction_outer.xyz);
             if dot(l, primary_sun) > 0.9999 { continue; }
         } else {

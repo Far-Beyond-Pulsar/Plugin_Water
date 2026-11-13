@@ -47,7 +47,7 @@ Every pass the plugin's feature adds to the default pipeline is a node of `.rend
 |---|---|---|
 | `helio.pass.water_transmission` | Water: Caustics | Lighting-inputs slot, order 20 (builds nothing where lighting runs before the inputs) |
 | `helio.pass.water_sim` | Water: Simulate + Draw | Overlay phase drawer, order 30 |
-| `helio.pass.water_reactivity` | Water: TSR Reactivity | Transparent phase drawer, order 50 (builds nothing without a reactive mask) |
+| `helio.pass.water_reactivity` | Water: TSR Reactivity | Transparent phase drawer, order 50 (builds only when the frame resolves temporally; runs only while the scene holds water) |
 
 ## Building and testing
 

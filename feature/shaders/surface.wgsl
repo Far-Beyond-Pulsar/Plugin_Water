@@ -2,7 +2,7 @@
 //!use water_volume
 //!use water_shore_surface
 //!use helio_hiz
-//!use atmosphere
+//!use frame_sky
 //!use water_sky
 //!use water_query
 //!use water_lights
@@ -53,8 +53,8 @@ struct OceanPhase { patches: array<vec4f, 4> }
 @group(0) @binding(18) var foam_material_samp: sampler;
 @group(0) @binding(19) var<storage, read> reflection_cameras: array<Camera, 1>;
 @group(0) @binding(20) var planar_reflection_tex: texture_2d<f32>;
-@group(0) @binding(25) var<uniform> atmosphere: AtmosphereFrame;
-@group(0) @binding(26) var<uniform> atmosphere_sky_table: array<vec4<f32>, 2304>;
+@group(0) @binding(25) var<uniform> sky_frame: SkyFrame;
+@group(0) @binding(26) var<uniform> sky_table: array<vec4<f32>, 2304>;
 @group(0) @binding(27) var sky_view_lut: texture_2d<f32>;
 @group(0) @binding(28) var<storage, read> water_lights: array<GpuLight>;
 fn water_sky_lut(uv: vec2f) -> vec3f {
@@ -396,12 +396,12 @@ fn water_all_sun_specular(
     normal: vec3f, view_dir: vec3f, fallback_light_dir: vec3f,
     alpha: f32, world_xz: vec2f, camera_distance: f32,
 ) -> vec3f {
-    if atmosphere.planet.w < 0.5 {
+    if sky_frame.planet.w < 0.5 {
         return water_sun_specular(normal, view_dir, fallback_light_dir, alpha, world_xz, camera_distance);
     }
     var result = vec3f(0.0);
-    for (var i = 0u; i < atmosphere.directional_light_count.x; i++) {
-        let light_dir = atmosphere.directional_lights[i * 3u].xyz;
+    for (var i = 0u; i < sky_frame.directional_light_count.x; i++) {
+        let light_dir = sky_frame.directional_lights[i * 3u].xyz;
         result += water_sun_specular(normal, view_dir, light_dir, alpha, world_xz, camera_distance);
     }
     return result;
@@ -418,9 +418,9 @@ fn water_inscatter(view_dir: vec3f, sun_dir: vec3f, vol: WaterVolume) -> vec3f {
     // directional light carries intensity 3 and a warm tint.
     let ambient = water_sky_ambient(sun_dir);
     var direct = vec3f(0.0);
-    if atmosphere.planet.w >= 0.5 {
-        for (var i = 0u; i < atmosphere.directional_light_count.x; i++) {
-            let light_dir = atmosphere.directional_lights[i * 3u].xyz;
+    if sky_frame.planet.w >= 0.5 {
+        for (var i = 0u; i < sky_frame.directional_light_count.x; i++) {
+            let light_dir = sky_frame.directional_lights[i * 3u].xyz;
             let light_radiance = water_sun_radiance(light_dir);
             let phase = clamp(helio_hg_phase(dot(view_dir, light_dir), 0.35)
                 * 4.0 * HELIO_PI, 0.4, 2.0);
@@ -899,9 +899,9 @@ fn fs_above(in: VertexOutput) -> vec4f {
     let n_dot_v = max(dot(normal, -view_dir), 1e-4);
     let crest_h = max(in.world_pos.y - vol.bounds_max.w, 0.0);
     var sss = vec3f(0.0);
-    if atmosphere.planet.w >= 0.5 {
-        for (var i = 0u; i < atmosphere.directional_light_count.x; i++) {
-            let light_dir = atmosphere.directional_lights[i * 3u].xyz;
+    if sky_frame.planet.w >= 0.5 {
+        for (var i = 0u; i < sky_frame.directional_light_count.x; i++) {
+            let light_dir = sky_frame.directional_lights[i * 3u].xyz;
             let sss_sun = water_sun_radiance(light_dir);
             let n_dot_l = dot(normal, light_dir);
             let sss_k1 = 1.6 * crest_h
@@ -954,9 +954,9 @@ fn fs_above(in: VertexOutput) -> vec4f {
     // as ambient, and the sun shining through thin foam from behind the crest.
     let foam_ambient = water_sky_ambient(light_dir);
     var foam_light = foam_ambient * 1.1 * foam_ao;
-    if atmosphere.planet.w >= 0.5 {
-        for (var i = 0u; i < atmosphere.directional_light_count.x; i++) {
-            let foam_dir = atmosphere.directional_lights[i * 3u].xyz;
+    if sky_frame.planet.w >= 0.5 {
+        for (var i = 0u; i < sky_frame.directional_light_count.x; i++) {
+            let foam_dir = sky_frame.directional_lights[i * 3u].xyz;
             let foam_sun = water_sun_radiance(foam_dir);
             foam_light += foam_sun * (0.15 + 0.85 * clamp(dot(foam_normal, foam_dir) * 0.8 + 0.2, 0.0, 1.0))
                 * mix(foam_ao, 1.0, 0.4);
