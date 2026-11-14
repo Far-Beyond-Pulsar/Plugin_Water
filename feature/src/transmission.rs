@@ -180,7 +180,7 @@ impl RenderPass for WaterTransmissionPass {
     fn reads(&self) -> &'static [&'static str] {
         &[
             helio_frame_api::gbuffer::DEPTH,
-            helio_frame_api::gbuffer::LIGHTMAP_UV,
+            helio_frame_api::gbuffer::SURFACE,
             "water_caustics",
             "water_caustics_deep",
         ]
@@ -243,11 +243,11 @@ impl RenderPass for WaterTransmissionPass {
         else {
             return Ok(());
         };
-        let (Some(near), Some(deep), Some(lightmap_uv)) = (
+        let (Some(near), Some(deep), Some(surface_tag)) = (
             ctx.registry.get(ResourceKey::new("water_caustics")),
             ctx.registry.get(ResourceKey::new("water_caustics_deep")),
             ctx.registry
-                .get(ResourceKey::new(helio_frame_api::gbuffer::LIGHTMAP_UV)),
+                .get(ResourceKey::new(helio_frame_api::gbuffer::SURFACE)),
         ) else {
             return Ok(());
         };
@@ -288,7 +288,7 @@ impl RenderPass for WaterTransmissionPass {
             });
             self.frame_group = Some((frame_key, group));
         }
-        let texture_key = [ctx.depth, lightmap_uv, near, deep].map(Clone::clone);
+        let texture_key = [ctx.depth, surface_tag, near, deep].map(Clone::clone);
         if self
             .texture_group
             .as_ref()
