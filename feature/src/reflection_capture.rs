@@ -329,6 +329,10 @@ struct VertexOut { @builtin(position) position: vec4<f32>, @location(0) uv: vec2
         let width = self.width;
         let height = self.height;
         let camera_buffer = self.camera_buffer.clone();
+        // The frame's stats, so the reflected view's culling and draws count
+        // into them (a private set only when the graph runs without a
+        // renderer).
+        let stats = ctx.stats().cloned();
         // The reflected render owns a separate ResourceRegistry. Propagate
         // the renderer-owned values its GBuffer and deferred-light passes
         // consume so the child view has the same material/environment state.
@@ -357,7 +361,8 @@ struct VertexOut { @builtin(position) position: vec4<f32>, @location(0) uv: vec2
             &self.mip_views[0],
             &self.depth_view,
             move |device, queue| {
-                build_secondary_graph(device, queue, &camera_buffer, width, height)
+                let stats = stats.unwrap_or_else(|| helio_core::FrameStats::new(device));
+                build_secondary_graph(device, queue, &camera_buffer, &stats, width, height)
             },
             |registry| {
                 registry.write(
@@ -467,15 +472,10 @@ fn build_secondary_graph(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     camera_buffer: &wgpu::Buffer,
+    stats: &helio_core::FrameStats,
     width: u32,
     height: u32,
 ) -> RenderGraph {
-    let stats = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Water Reflection Cull Stats"),
-        size: 4096,
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
     let mut graph = RenderGraph::new_with_external_device_ref(device, queue);
     graph.declare_external_input(helio_frame_api::color::SCENE_COLOR);
     graph.declare_external_input(helio_mats::MATERIAL_TEXTURES);
@@ -484,7 +484,7 @@ fn build_secondary_graph(
         device,
     )));
     graph.add_pass(Box::new(
-        helio_pass_indirect_dispatch::IndirectDispatchPass::new(device, stats.clone()),
+        helio_pass_indirect_dispatch::IndirectDispatchPass::new(device, stats),
     ));
     let cull_sampler = Arc::new(device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Water Reflection Cull Sampler"),
