@@ -29,7 +29,8 @@ env_logger = "0.11"
 glam = { workspace = true }
 helio = { workspace = true }
 helio-bake = { workspace = true }
-helio-components = { workspace = true, features = ["bake"] }
+helio-bake-host = { workspace = true }
+helio-components = { workspace = true }
 helio-core = { workspace = true }
 helio-feature-api = { workspace = true }
 helio-mesh-api = { workspace = true }
@@ -38,7 +39,7 @@ helio-pass-forward-lit = { workspace = true }
 helio-pass-perf-overlay = { workspace = true }
 helio-pass-gi = { workspace = true }
 helio-pass-sky = { workspace = true, features = ["host-rows"] }
-helio-pass-lens = { workspace = true }
+helio-pass-lens = { workspace = true, features = ["host-rows"] }
 helio-pass-vg = { workspace = true }
 helio-vg-build = { workspace = true }
 helio-vg-format = { workspace = true }
@@ -52,10 +53,7 @@ helio-presets = { workspace = true }
 image = { workspace = true, features = ["png", "jpeg"] }
 log = { workspace = true }
 pollster = "0.4"
-# `#[derive(SceneStore)]` expands to reflection paths.
-pulsar_reflection = { workspace = true }
 pulsar_scenedb = { workspace = true }
-pulsar_scenedb_derive = { workspace = true }
 scenedb-inspector-agent = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }

@@ -14,7 +14,6 @@
 
 mod common;
 mod forest_scene;
-mod lens_rows;
 mod vg_support;
 
 use common::{
@@ -249,8 +248,12 @@ impl ApplicationHandler for App {
             helio_pass_water_sim::host_rows::WaterVolumeComponent::register_gpu_columns_growable(
                 store, 8, &device,
             );
-            lens_rows::LensComponent::register_gpu_columns_growable(store, 64, &device);
-            lens_rows::LensElementComponent::register_gpu_columns_growable(store, 64, &device);
+            helio_pass_lens::host_rows::LensComponent::register_gpu_columns_growable(
+                store, 64, &device,
+            );
+            helio_pass_lens::host_rows::LensElementComponent::register_gpu_columns_growable(
+                store, 64, &device,
+            );
             helio_pass_volumetric_fog::host_rows::GlobalFogComponent::register_gpu_columns_growable(
                 store, 16, &device,
             );
@@ -505,7 +508,8 @@ impl ApplicationHandler for App {
         // ── the lens: 35 mm f/5.6, focused per view ──
         let lens_entity = {
             use helio_pass_lens::{LensElementRow, LensRegion::FullFrame as F};
-            let mut lens = lens_rows::LensComponent::from(helio_pass_lens::LensRow::new(0));
+            let mut lens =
+                helio_pass_lens::host_rows::LensComponent::from(helio_pass_lens::LensRow::new(0));
             lens.focal_length_mm = 35.0;
             lens.f_number = 5.6;
             lens.t_stop = 5.6;
@@ -526,7 +530,7 @@ impl ApplicationHandler for App {
                 let element = elements
                     .get(i)
                     .map_or_else(bytemuck::Zeroable::zeroed, |e| {
-                        lens_rows::LensElementComponent::from(*e)
+                        helio_pass_lens::host_rows::LensElementComponent::from(*e)
                     });
                 scene_db.world.insert(*slot, element);
             }
@@ -620,7 +624,7 @@ impl AppState {
         if let Some(mut lens) = self
             .scene_db
             .world
-            .get_mut::<lens_rows::LensComponent>(self.lens)
+            .get_mut::<helio_pass_lens::host_rows::LensComponent>(self.lens)
         {
             lens.focus_distance_m = view.focus_m;
         }

@@ -683,15 +683,15 @@ impl ApplicationHandler for App {
         });
         renderer.set_clear_color([0.0, 0.0, 0.0, 1.0]);
 
-        // ── Configure baking ──────────────────────────────────────────────
-        // Helio automatically extracts all static objects and lights for baking.
-        // No need to manually duplicate scene geometry - just specify the config.
-        // The renderer never walks the scene: hand it SceneDB's projection
-        // first, or there is nothing to bake (Helio#256).
-        helio_components::bake(
+        // Bake the cathedral's indirect light (lights stay dynamic) and
+        // install it: the graph rebuilds with the bake's nodes. The renderer
+        // never walks the scene: the bake reads SceneDB's projection
+        // (Helio#256).
+        helio_bake_host::bake(
             &mut renderer,
-            helio_mesh_host::bake_scene_from_world(&scene_db.world),
-            BakeConfig::fast("indoor_cathedral_water"),
+            helio_bake_host::bake_scene_from_world(&scene_db.world),
+            BakeConfig::fast("indoor_cathedral_water")
+                .with_store(helio_bake_host::disk_store("bake_cache")),
         )
         .expect("bake the cathedral");
 

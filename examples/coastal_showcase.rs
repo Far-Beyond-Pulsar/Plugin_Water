@@ -12,7 +12,6 @@
 
 mod coast_scene;
 mod common;
-mod lens_rows;
 
 use common::{
     box_mesh, make_material, new_scene_db_with_gpu_mirror, point_light, scene_db_handle,
@@ -137,8 +136,12 @@ impl ApplicationHandler for App {
         };
         let mut scene_db = common::new_scene_db_with_gpu_mirror_and(&device, &queue, |store| {
             // The camera lens and its element block (the lens plugin's rows).
-            lens_rows::LensComponent::register_gpu_columns_growable(store, 64, &device);
-            lens_rows::LensElementComponent::register_gpu_columns_growable(store, 64, &device);
+            helio_pass_lens::host_rows::LensComponent::register_gpu_columns_growable(
+                store, 64, &device,
+            );
+            helio_pass_lens::host_rows::LensElementComponent::register_gpu_columns_growable(
+                store, 64, &device,
+            );
         });
         let textures = Arc::new(std::sync::RwLock::new(
             pulsar_scenedb::gpu::TextureStore::new(2048),
@@ -451,7 +454,8 @@ impl ApplicationHandler for App {
                 "cliffs" => 30.0,
                 _ => 8.0,
             };
-            let mut lens = lens_rows::LensComponent::from(helio_pass_lens::LensRow::new(0));
+            let mut lens =
+                helio_pass_lens::host_rows::LensComponent::from(helio_pass_lens::LensRow::new(0));
             lens.focal_length_mm = 35.0;
             lens.f_number = 5.6;
             lens.t_stop = 5.6;
@@ -474,7 +478,7 @@ impl ApplicationHandler for App {
                 let element = elements
                     .get(i)
                     .map_or_else(bytemuck::Zeroable::zeroed, |e| {
-                        lens_rows::LensElementComponent::from(*e)
+                        helio_pass_lens::host_rows::LensElementComponent::from(*e)
                     });
                 scene_db.world.insert(*slot, element);
             }
