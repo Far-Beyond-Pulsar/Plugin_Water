@@ -11,7 +11,6 @@ use helio_core::{PassContext, PrepareContext, RenderPass, ResourceKey, Result as
 use helio_frame_api::lighting::{
     TRANSMISSION, TRANSMISSION_FORMAT, VIEW_REMAPS, VIEW_REMAPS_BYTES,
 };
-use pulsar_scenedb::gpu::BufferKey;
 use wgpu::util::DeviceExt;
 
 /// Writes `transmission` while the scene has water.
@@ -168,7 +167,7 @@ impl RenderPass for WaterTransmissionPass {
     }
 
     fn scene_buffers(&self) -> &'static [&'static str] {
-        const LIST: &[&str] = &[crate::WATER_VOLUMES.name(), VIEW_REMAPS];
+        const LIST: &[&str] = &[crate::WATER_VOLUMES.name()];
         LIST
     }
 
@@ -251,13 +250,12 @@ impl RenderPass for WaterTransmissionPass {
         ) else {
             return Ok(());
         };
+        // The frame's view table: an inline view's pixels hold caustics of
+        // their content's water.
         let remaps = ctx
-            .scene_buffers
-            .get(BufferKey::of(VIEW_REMAPS))
-            .map_or_else(
-                || self.fallback_remaps.clone(),
-                |handle| handle.buffer.clone(),
-            );
+            .registry
+            .get::<&wgpu::Buffer>(ResourceKey::new(VIEW_REMAPS))
+            .map_or_else(|| self.fallback_remaps.clone(), |buffer| buffer.clone());
         let frame_key = [ctx.camera.clone(), volumes, remaps];
         if self
             .frame_group
