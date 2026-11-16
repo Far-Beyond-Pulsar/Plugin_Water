@@ -20,6 +20,7 @@ helio-light-api = { workspace = true }
 helio-frame-api = { workspace = true }
 helio-water-api = { workspace = true }
 helio-feature-api = { workspace = true }
+helio-settings = { workspace = true }
 pulsar_reflection = { workspace = true }
 helio-core = { workspace = true }
 helio-pass-hiz = { workspace = true }

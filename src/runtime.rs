@@ -4,7 +4,16 @@
 use engine_backend::scene::helio_bridge::SceneRowsRegistration;
 use engine_backend::scene::{ClassSpec, ComponentsBuilder};
 use engine_backend::subsystems::render::{AnimatedContentRegistration, RenderFeatureRegistration};
+use engine_backend::subsystems::render::helio_renderer::project_settings;
+use pulsar_settings::project::rendering::SettingsGroupRegistration;
 use water_component::WaterVolumeComponent;
+
+/// The project's water settings, handed to the water feature.
+fn configure_renderer(config: helio::RendererConfig) -> helio::RendererConfig {
+    config.with_feature(helio_pass_water_sim::WaterSettings::from_settings(
+        &project_settings::resolved(&helio_pass_water_sim::settings::WATER),
+    ))
+}
 
 /// Everything the water plugin registers for a game.
 pub(crate) fn build(p: &mut pulsar_plugins::PluginBuilder) {
@@ -20,7 +29,13 @@ pub(crate) fn build(p: &mut pulsar_plugins::PluginBuilder) {
     p.add(RenderFeatureRegistration {
         origin: p.origin(),
         features: water_component::render_features,
-        configure: |config| config,
+        configure: configure_renderer,
+    });
+
+    // The `project.water` settings group (the reflection's resolution).
+    p.add(SettingsGroupRegistration {
+        origin: p.origin(),
+        group: &helio_pass_water_sim::settings::WATER,
     });
 
     // The volumes' source rows and the row join that places them, writes

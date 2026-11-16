@@ -14,6 +14,10 @@ autoexamples = false
 editor = ["dep:water_editor", "dep:ui_level_editor"]
 
 [dependencies]
+# The `project.water` settings group, read into the water feature's settings.
+pulsar_settings = { workspace = true }
+helio = { workspace = true }
+helio-pass-water-sim = { workspace = true }
 # The plugin gate and the builder its registrations go through.
 pulsar_plugins = { workspace = true }
 # The plugin's crates.
@@ -32,10 +36,8 @@ pulsar_scenedb = { workspace = true }
 pulsar_scene_model = { workspace = true }
 # The row join suite (`tests/scene_rows.rs`): the engine's join harness and
 # the kinds whose rows the water reads (their roots register them).
-helio = { workspace = true }
 helio-core = { workspace = true }
 helio-scene-join = { workspace = true }
-helio-pass-water-sim = { workspace = true }
 helio-light-api = { workspace = true }
 wgpu = { workspace = true }
 bytemuck = { workspace = true }

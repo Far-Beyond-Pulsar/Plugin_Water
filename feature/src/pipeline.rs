@@ -332,6 +332,12 @@ impl CausticsProjection {
 
 impl WaterSimPass {
     #[allow(clippy::too_many_arguments)]
+    /// The pass with the host's water settings ([`crate::WaterSettings`]).
+    pub fn with_settings(mut self, settings: &crate::WaterSettings) -> Self {
+        self.reflection_scale = settings.reflection_scale.clamp(0.25, 1.0);
+        self
+    }
+
     pub fn new(
         device: &wgpu::Device,
         _camera_buf: &wgpu::Buffer,
@@ -1862,6 +1868,8 @@ impl WaterSimPass {
             ocean_fft: crate::ocean_fft::OceanFft::new(device),
             surface_queries: crate::surface_query::WaterSurfaceQueries::new(device),
             reflection_capture: None,
+            reflection_scale: crate::WaterSettings::default().reflection_scale,
+            water_in_view: crate::capture_schedule::WaterInView::new(),
             ocean_rest_height: 0.0,
             shore_swell: 1.0,
             shore_map: None,

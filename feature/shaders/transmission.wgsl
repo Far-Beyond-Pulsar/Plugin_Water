@@ -12,7 +12,7 @@
 @group(0) @binding(2) var<uniform> water_caustics_phase: vec4<f32>;
 // `helio_frame_api::lighting::VIEW_REMAPS`: a remapped pixel's caustics are
 // where its content really is.
-@group(0) @binding(3) var<uniform> view_remaps: array<mat4x4<f32>, 256>;
+@group(0) @binding(3) var<uniform> view_remaps: array<mat4x4<f32>, 1024>;
 @group(1) @binding(0) var gbuf_depth: texture_depth_2d;
 @group(1) @binding(1) var gbuf_surface_tag: texture_2d<f32>;
 @group(1) @binding(2) var water_caustics: texture_2d<f32>;
@@ -34,7 +34,7 @@ fn fs_main(@builtin(position) clip_pos: vec4<f32>) -> @location(0) vec4<f32> {
     let ndc_xy = vec2<f32>(screen_uv.x * 2.0 - 1.0, 1.0 - screen_uv.y * 2.0);
     let world_h = cameras[0].view_proj_inv * vec4<f32>(ndc_xy, depth, 1.0);
     var world_pos = world_h.xyz / world_h.w;
-    let chain = view_remap_of(textureLoad(gbuf_surface_tag, pix, 0).rg);
+    let chain = gbuffer_remap_of(textureLoad(gbuf_surface_tag, pix, 0).rg);
     if chain >= 0 {
         world_pos = (view_remaps[chain] * vec4<f32>(world_pos, 1.0)).xyz;
     }
