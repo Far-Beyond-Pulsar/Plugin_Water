@@ -1028,7 +1028,6 @@ impl RenderPass for WaterSimPass {
         } else {
             self.reflection_capture = Some(reflection_capture::PlanarReflectionCapture::new(
                 ctx.device,
-                ctx.queue,
                 reflection_size.0,
                 reflection_size.1,
             ));
@@ -1225,10 +1224,19 @@ impl RenderPass for WaterSimPass {
         Ok(())
     }
 
-    fn execute(&mut self, ctx: &mut PassContext) -> HelioResult<()> {
+    /// The surface reflects a capture of the frame, rendered before it draws.
+    fn renders_views(&self) -> bool {
+        true
+    }
+
+    fn render_views(&mut self, views: &mut helio_core::ViewContext<'_>) -> HelioResult<()> {
         if let Some(capture) = self.reflection_capture.as_mut() {
-            capture.render_from_context(ctx, self.ocean_rest_height)?;
+            capture.render(views, self.ocean_rest_height)?;
         }
+        Ok(())
+    }
+
+    fn execute(&mut self, ctx: &mut PassContext) -> HelioResult<()> {
         // Spectral ocean is the primary wave source. The legacy simulation
         // remains a localized hitbox/drop interaction adapter; it no longer
         // supplies wind-sea waves.

@@ -721,7 +721,9 @@ fn water_reflection(
     // The mirrored capture is invalid underwater (or before the first above-
     // water frame). Do not sample a stale prior view; retain the analytic sky
     // baseline and let screen-space hits refine it when enabled.
-    let capture_valid = bitcast<u32>(reflection_cameras[0].jitter_frame.w) == 0x57415445u;
+    // The capture is a mirrored view (`helio_core::view`); a camera left
+    // without the flag means none rendered this frame.
+    let capture_valid = (reflection_cameras[0].view_info.y & HELIO_VIEW_MIRRORED) != 0u;
     if !capture_valid {
         if vol.ssr_params.x <= 0.5 {
             return sky;
@@ -745,9 +747,11 @@ fn water_reflection(
     // water and keeping high-frequency FFT chop stable.
     let reflection_lod = clamp(length(normal.xz) * 1.7, 0.0, 8.0);
     let planar_raw = textureSampleLevel(planar_reflection_tex, shared_samp, capture_uv, reflection_lod);
-    // The capture holds only lit geometry: sky pixels are never written, so
-    // they stay black. Fill them with the sky (Ultra-Water composites its
-    // premultiplied planar target over the sky cube the same way).
+    // The capture is the frame's lit view, its sky included where the frame
+    // composites one; where it holds nothing (no sky feature, or past its
+    // clip plane) it stays black, and the sky fills it (Ultra-Water
+    // composites its premultiplied planar target over the sky cube the same
+    // way).
     let coverage = smoothstep(0.0, 0.03, dot(planar_raw.rgb, vec3f(1.0)));
     let planar = mix(sky, planar_raw.rgb, coverage);
 
