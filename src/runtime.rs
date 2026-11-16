@@ -3,8 +3,8 @@
 
 use engine_backend::scene::helio_bridge::SceneRowsRegistration;
 use engine_backend::scene::{ClassSpec, ComponentsBuilder};
-use engine_backend::subsystems::render::{AnimatedContentRegistration, RenderFeatureRegistration};
 use engine_backend::subsystems::render::helio_renderer::project_settings;
+use engine_backend::subsystems::render::{AnimatedContentRegistration, RenderFeatureRegistration};
 use pulsar_settings::project::rendering::SettingsGroupRegistration;
 use water_component::WaterVolumeComponent;
 
