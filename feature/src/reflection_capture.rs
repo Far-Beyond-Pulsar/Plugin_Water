@@ -272,8 +272,8 @@ struct VertexOut { @builtin(position) position: vec4<f32>, @location(0) uv: vec2
     /// (`helio_core::view`) across the water's rest plane, clipped at it, into
     /// the mip chain's top level, then its mips. Every feature the frame
     /// places at the capture's slots and phases draws in it (meshes,
-    /// foliage, decals, virtual geometry, terrain, the sky); none is named
-    /// here.
+    /// foliage, decals, virtual geometry, the sky; voxel terrain builds
+    /// nothing in a secondary view yet); none is named here.
     pub(super) fn render(
         &mut self,
         views: &mut helio_core::ViewContext<'_>,

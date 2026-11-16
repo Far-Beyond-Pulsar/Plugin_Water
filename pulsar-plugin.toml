@@ -14,8 +14,6 @@ requires = [
     { id = "pulsar.foliage.api", optional = true },
     { id = "pulsar.lights.rows", optional = true },
     { id = "pulsar.lights.api", optional = true },
-    { id = "pulsar.materials.api", optional = true },
-    { id = "pulsar.meshes.api", optional = true },
 ]
 
 # The plugin's root crate (the package in this directory): the one place it
