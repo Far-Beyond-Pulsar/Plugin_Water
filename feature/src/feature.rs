@@ -56,7 +56,8 @@ impl Feature for WaterFeature {
                         iw,
                         ih,
                         build.env.scene_format(),
-                    );
+                    )
+                    .with_settings(&crate::water_settings(build.env));
                     build.graph.add_pass(Box::new(pass));
                     Ok(())
                 },

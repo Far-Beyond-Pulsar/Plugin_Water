@@ -14,11 +14,14 @@ use helio_core::{CommandRecorder, PassContext, PrepareContext, RenderPass, Resul
 use std::f32::consts::PI;
 use wgpu::util::DeviceExt;
 
+mod capture_schedule;
 pub mod components;
 pub mod gpu_types;
 pub mod ocean_fft;
 pub mod reactivity;
 mod reflection_capture;
+pub mod settings;
+pub use settings::{water_settings, WaterSettings};
 pub mod shoreline;
 pub mod surface_query;
 pub mod transmission;
@@ -223,6 +226,11 @@ pub struct WaterSimPass {
     /// Secondary mirrored opaque view, rendered before the surface shade and
     /// retained across frames so its HDR target and graph survive resize.
     pub(crate) reflection_capture: Option<reflection_capture::PlanarReflectionCapture>,
+    /// The capture's size per axis, a fraction of the internal size
+    /// ([`WaterSettings::reflection_scale`]).
+    pub(crate) reflection_scale: f32,
+    /// Whether any water volume is in view: the capture renders only then.
+    pub(crate) water_in_view: capture_schedule::WaterInView,
     /// Absolute-world rest plane for planar capture, in sync with the authored
     /// water volume's `bounds_max.w` value.
     pub(crate) ocean_rest_height: f64,
@@ -1022,7 +1030,9 @@ impl RenderPass for WaterSimPass {
 
     fn prepare(&mut self, ctx: &PrepareContext) -> HelioResult<()> {
         self.surface_queries.prepare();
-        let reflection_size = (ctx.width.max(1).div_ceil(2), ctx.height.max(1).div_ceil(2));
+        let scaled =
+            |size: u32| ((size.max(1) as f32 * self.reflection_scale).ceil() as u32).max(1);
+        let reflection_size = (scaled(ctx.width), scaled(ctx.height));
         if let Some(capture) = self.reflection_capture.as_mut() {
             capture.resize(reflection_size.0, reflection_size.1);
         } else {
@@ -1231,7 +1241,8 @@ impl RenderPass for WaterSimPass {
 
     fn render_views(&mut self, views: &mut helio_core::ViewContext<'_>) -> HelioResult<()> {
         if let Some(capture) = self.reflection_capture.as_mut() {
-            capture.render(views, self.ocean_rest_height)?;
+            let water_in_view = self.water_in_view.visible(views);
+            capture.render(views, self.ocean_rest_height, water_in_view)?;
         }
         Ok(())
     }

@@ -278,6 +278,7 @@ struct VertexOut { @builtin(position) position: vec4<f32>, @location(0) uv: vec2
         &mut self,
         views: &mut helio_core::ViewContext<'_>,
         rest_y: f64,
+        water_in_view: bool,
     ) -> helio_core::Result<()> {
         let source = *views.camera_data;
         let plane_y = (rest_y - views.world_origin.y) as f32;
@@ -285,7 +286,9 @@ struct VertexOut { @builtin(position) position: vec4<f32>, @location(0) uv: vec2
         // mirror is not a meaningful view; the surface falls back to its sky
         // and screen-space trace (`view_info` left clear marks it invalid).
         let above = source.position_near[1] > plane_y;
-        let rendered = above && views.can_render() && {
+        // Nor while no water is in view (`capture_schedule`): nothing samples
+        // it then.
+        let rendered = water_in_view && above && views.can_render() && {
             let source_view = Mat4::from_cols_array(&source.view);
             let reflection = Mat4::from_translation(Vec3::new(0.0, 2.0 * plane_y, 0.0))
                 * Mat4::from_scale(Vec3::new(1.0, -1.0, 1.0));
@@ -312,16 +315,13 @@ struct VertexOut { @builtin(position) position: vec4<f32>, @location(0) uv: vec2
             let target = &self.mip_views[0];
             let request = helio_core::ViewRequest {
                 key: 0,
-                kind: helio_core::ViewKind::Capture,
                 mirrored: true,
                 camera,
-                content_to_drawn: Mat4::IDENTITY,
                 width: self.width,
                 height: self.height,
                 target,
                 depth: &self.depth_view,
                 depth_texture: &self.depth,
-                imports: &[],
                 seeds: &[(helio_frame_api::color::SCENE_COLOR, target)],
             };
             let rendered = views.render_view(&request)?;
