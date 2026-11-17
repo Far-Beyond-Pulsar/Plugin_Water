@@ -14,14 +14,10 @@ mod coast_scene;
 mod common;
 
 use common::{
-    box_mesh, make_material, new_scene_db_with_gpu_mirror, point_light, scene_db_handle,
-    spawn_light, spawn_material, spawn_mesh, spawn_object, spawn_sky, spawn_water_volume,
-    SurfaceCapture, WaterVolumeDescriptor,
+    point_light, scene_db_handle, spawn_light, spawn_sky, spawn_water_volume, SurfaceCapture,
+    WaterVolumeDescriptor,
 };
-use helio::{
-    required_experimental_features, required_wgpu_features, required_wgpu_limits, Camera, Renderer,
-    RendererBuilder, RendererConfig,
-};
+use helio::{Camera, Renderer, RendererBuilder, RendererConfig};
 use helio_pass_water_sim::WaterSimPass;
 use pulsar_scenedb::{Entity, SceneDb};
 
@@ -118,7 +114,6 @@ impl ApplicationHandler for App {
         let device = graphics.device.clone();
         let queue = graphics.queue.clone();
         let format = graphics.surface_config.format;
-        let surface_format = format;
 
         let config = RendererConfig::new(size.width, size.height, format).with_feature(
             helio_light_api::ShadowSettings {

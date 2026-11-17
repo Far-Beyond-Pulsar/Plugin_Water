@@ -2160,11 +2160,6 @@ impl RenderPass for WaterSimPass {
                     )
                     .clone();
 
-                let depth_attachment = wgpu::RenderPassDepthStencilAttachment {
-                    view: depth_view,
-                    depth_ops: None,
-                    stencil_ops: None,
-                };
                 let color_attachments = [Some(wgpu::RenderPassColorAttachment {
                     view: water_output_view,
                     resolve_target: None,

@@ -26,10 +26,7 @@ use common::{
     sphere_mesh, update_light, update_object_transform, update_water_hitbox, WaterHitboxDescriptor,
     WaterVolumeDescriptor,
 };
-use helio::{
-    required_experimental_features, required_wgpu_features, required_wgpu_limits, Camera,
-    HelioAction, HelioCommandBridge, Renderer, RendererBuilder, RendererConfig,
-};
+use helio::{Camera, HelioAction, HelioCommandBridge, Renderer, RendererBuilder, RendererConfig};
 use helio_bake::BakeConfig;
 use helio_pass_perf_overlay::PerfOverlayMode;
 use helio_pass_water_sim::WaterSimPass;
@@ -147,7 +144,6 @@ struct AppState {
     surface: wgpu::Surface<'static>,
     capture: common::SurfaceCapture,
     device: Arc<wgpu::Device>,
-    queue: Arc<wgpu::Queue>,
     surface_format: wgpu::TextureFormat,
     renderer: Arc<Mutex<Renderer>>,
     action_rx: Receiver<HelioAction>,
@@ -244,7 +240,6 @@ impl ApplicationHandler for App {
         let device = graphics.device.clone();
         let queue = graphics.queue.clone();
         let format = graphics.surface_config.format;
-        let surface_format = format;
 
         let config = RendererConfig::new(size.width, size.height, format).with_feature(
             helio_light_api::ShadowSettings {
@@ -721,7 +716,6 @@ impl ApplicationHandler for App {
             surface,
             capture: common::SurfaceCapture::from_env(),
             device,
-            queue,
             surface_format: format,
             renderer,
             action_rx,

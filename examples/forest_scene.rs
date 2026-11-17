@@ -556,7 +556,7 @@ fn build_terrain(
     root: &Path,
 ) -> Result<(), String> {
     let tex = root.join("tex");
-    let mut materials = [
+    let materials = [
         texture_material(world, device, queue, &tex.join("mossy_rock"), 2048)?,
         texture_material(world, device, queue, &tex.join("pebbles"), 2048)?,
         texture_material(world, device, queue, &tex.join("leafy_grass"), 2048)?,

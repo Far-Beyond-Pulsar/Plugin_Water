@@ -17,10 +17,7 @@ use common::{
     spawn_light, spawn_material, spawn_mesh, spawn_object, spawn_sky, spawn_water_volume,
     SurfaceCapture, WaterVolumeDescriptor,
 };
-use helio::{
-    required_experimental_features, required_wgpu_features, required_wgpu_limits, Camera, Renderer,
-    RendererBuilder, RendererConfig,
-};
+use helio::{Camera, Renderer, RendererBuilder, RendererConfig};
 use helio_pass_water_sim::WaterSimPass;
 use pulsar_scenedb::{Entity, SceneDb};
 
@@ -145,7 +142,6 @@ impl ApplicationHandler for App {
         let device = graphics.device.clone();
         let queue = graphics.queue.clone();
         let format = graphics.surface_config.format;
-        let surface_format = format;
 
         let config = RendererConfig::new(size.width, size.height, format).with_feature(
             helio_light_api::ShadowSettings {

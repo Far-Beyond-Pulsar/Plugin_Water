@@ -79,6 +79,4 @@ mod tests {
     }
 }
 #[cfg(test)]
-mod lifecycle_tests {
-    use super::{WaterHitboxRow, WaterVolumeRow};
-}
+mod lifecycle_tests {}
