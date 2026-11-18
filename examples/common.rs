@@ -302,7 +302,7 @@ pub fn spawn_sky(world: &mut World, tint: [f32; 3]) -> Entity {
 /// into the raw `[f32; 4]` slots `helio_pass_water_sim::host_rows::WaterVolumeComponent`
 /// stores GPU-side. Field-to-slot mapping mirrors the `WaterVolume` struct
 /// documented in that pass's WGSL shaders (`surface.wgsl`, `caustics.wgsl`,
-/// `underwater_fog.wgsl`, `hitbox.frag.wgsl`) -- this is the removed
+/// `underwater_fog.wgsl`, `interaction.wgsl`) -- this is the removed
 /// `helio::WaterVolumeDescriptor`/`.to_gpu()` pair reconstructed from the
 /// shader-documented layout, since neither survived the SceneDB migration.
 ///
@@ -481,7 +481,7 @@ pub fn spawn_water_volume(world: &mut World, descriptor: WaterVolumeDescriptor) 
 }
 
 /// CPU-friendly description of one AABB water-displacement hitbox; packs into
-/// `helio_pass_water_sim::host_rows::WaterHitboxComponent` per `hitbox.frag.wgsl`'s
+/// `helio_pass_water_sim::host_rows::WaterHitboxComponent` per `interaction.wgsl`'s
 /// `GpuWaterHitbox` layout. Coordinates are world space; the simulation
 /// maps the box into each water volume it overlaps.
 #[derive(Clone, Copy, Debug)]

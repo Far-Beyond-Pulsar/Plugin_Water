@@ -49,6 +49,18 @@ Every pass the plugin's feature adds to the default pipeline is a node of `.rend
 | `helio.pass.water_sim` | Water: Simulate + Draw | Overlay phase drawer, order 30 |
 | `helio.pass.water_reactivity` | Water: TSR Reactivity | Transparent phase drawer, order 50 (builds only when the frame resolves temporally; runs only while the scene holds water) |
 
+## Water simulation and GPU profiling
+
+The FFT ocean provides wind-driven waves. Local drops and moving bodies drive
+a separate shallow-water heightfield. The water feature classifies the live
+volume rows on the GPU and dispatches one interaction layer per live slot.
+A retired slot is cleared once. Diagnostic layers keep their three-layer
+stride so existing readers can still find each slot's interaction layer.
+
+The graph's `WaterSim` timing contains the `Water: FFT`, `Water: interaction`,
+`Water: caustics`, and `Water: surface` GPU subscopes. The planar reflection
+runs in the earlier mirrored view and has separate view-graph timings.
+
 ## Building and testing
 
 Like [Plugin_Physics](https://github.com/Far-Beyond-Pulsar/Plugin_Physics), this plugin's crates are members

@@ -28,12 +28,8 @@ fn the_water_shaders_validate_with_the_volume_row() {
     for (name, text) in [
         ("caustics.wgsl", include_str!("../shaders/caustics.wgsl")),
         (
-            "update.frag.wgsl",
-            include_str!("../shaders/update.frag.wgsl"),
-        ),
-        (
-            "hitbox.frag.wgsl",
-            include_str!("../shaders/hitbox.frag.wgsl"),
+            "interaction.wgsl",
+            include_str!("../shaders/interaction.wgsl"),
         ),
         ("spray.wgsl", include_str!("../shaders/spray.wgsl")),
         (

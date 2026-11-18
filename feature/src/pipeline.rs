@@ -1,7 +1,6 @@
-use crate::simulation::{DeltaUniform, DropUniform, HitboxCountUniform};
 use crate::{
     make_caustics_grid, make_top_grid, vec4_vbl, WaterSimPass, BLIT_WGSL, CASCADE_COUNT,
-    MAX_SIM_VOLUMES, MAX_WATER_HITBOXES,
+    MAX_SIM_VOLUMES,
 };
 use bytemuck::Zeroable;
 use wgpu::util::DeviceExt;
@@ -75,11 +74,9 @@ fn sampler_entry(binding: u32, kind: wgpu::SamplerBindingType) -> wgpu::BindGrou
 /// volume row and cascade, `size` square.
 pub(crate) struct SimTextures {
     pub(crate) tex_a: wgpu::Texture,
-    pub(crate) tex_b: wgpu::Texture,
     pub(crate) array_a: wgpu::TextureView,
     pub(crate) array_b: wgpu::TextureView,
     pub(crate) layers_a: Vec<wgpu::TextureView>,
-    pub(crate) layers_b: Vec<wgpu::TextureView>,
 }
 
 impl SimTextures {
@@ -99,6 +96,7 @@ impl SimTextures {
                 format: wgpu::TextureFormat::Rgba16Float,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::STORAGE_BINDING
                     | wgpu::TextureUsages::COPY_SRC
                     | wgpu::TextureUsages::COPY_DST,
                 view_formats: &[],
@@ -129,11 +127,9 @@ impl SimTextures {
         };
         Self {
             layers_a: layers(&tex_a, "A"),
-            layers_b: layers(&tex_b, "B"),
             array_a: array(&tex_a, "WaterSim Array View A"),
             array_b: array(&tex_b, "WaterSim Array View B"),
             tex_a,
-            tex_b,
         }
     }
 }
@@ -345,237 +341,12 @@ impl WaterSimPass {
         internal_height: u32,
         surface_format: wgpu::TextureFormat,
     ) -> Self {
-        let vert = helio_core::shader::module(
-            device,
-            "WaterSim VS",
-            helio_core::include_wgsl!("../shaders/fullscreen.vert.wgsl"),
-        );
-        let drop_frag = helio_core::shader::module(
-            device,
-            "WaterSim Drop FS",
-            helio_core::include_wgsl!("../shaders/drop.frag.wgsl"),
-        );
-        let update_frag = helio_core::shader::module_with(
-            device,
-            "WaterSim Update FS",
-            helio_core::include_wgsl!("../shaders/update.frag.wgsl"),
-            &[crate::WATER_VOLUME_SNIPPET],
-        );
-        let normal_frag = helio_core::shader::module(
-            device,
-            "WaterSim Normal FS",
-            helio_core::include_wgsl!("../shaders/normal.frag.wgsl"),
-        );
-        let hitbox_frag = helio_core::shader::module_with(
-            device,
-            "WaterSim Hitbox FS",
-            helio_core::include_wgsl!("../shaders/hitbox.frag.wgsl"),
-            &[crate::WATER_VOLUME_SNIPPET],
-        );
-
-        let sim_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("WaterSim BGL"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
-
-        // The update step also reads each volume's row for its own dynamics.
-        let update_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("WaterSim Update BGL"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
-
-        let hitbox_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("WaterSim Hitbox BGL"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // The previous frame's hitbox rows (`hitbox_prev_buf`).
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // The water volumes, mapping world boxes into each one.
-                wgpu::BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
-
-        let sim_pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("WaterSim PL"),
-            bind_group_layouts: &[Some(&sim_bgl)],
-            immediate_size: 0,
-        });
-        let update_pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("WaterSim Update PL"),
-            bind_group_layouts: &[Some(&update_bgl)],
-            immediate_size: 0,
-        });
-        let hitbox_pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("WaterSim Hitbox PL"),
-            bind_group_layouts: &[Some(&hitbox_bgl)],
-            immediate_size: 0,
-        });
-
-        let make_sim_pipeline =
-            |label, layout: &wgpu::PipelineLayout, frag: &wgpu::ShaderModule| {
-                helio_core::shader::create_render_pipeline(
-                    &device,
-                    wgpu::RenderPipelineDescriptor {
-                        label: Some(label),
-                        layout: Some(layout),
-                        vertex: wgpu::VertexState {
-                            module: &vert,
-                            entry_point: Some("vs_main"),
-                            buffers: &[],
-                            compilation_options: Default::default(),
-                        },
-                        fragment: Some(wgpu::FragmentState {
-                            module: frag,
-                            entry_point: Some("fs_main"),
-                            compilation_options: Default::default(),
-                            targets: &[Some(wgpu::ColorTargetState {
-                                format: wgpu::TextureFormat::Rgba16Float,
-                                blend: None,
-                                write_mask: wgpu::ColorWrites::ALL,
-                            })],
-                        }),
-                        primitive: wgpu::PrimitiveState {
-                            topology: wgpu::PrimitiveTopology::TriangleList,
-                            ..Default::default()
-                        },
-                        depth_stencil: None,
-                        multisample: wgpu::MultisampleState::default(),
-                        multiview_mask: None,
-                        cache: None,
-                    },
-                )
-            };
-
-        let drop_pipeline = make_sim_pipeline("WaterSim Drop", &sim_pl, &drop_frag);
-        let update_pipeline = make_sim_pipeline("WaterSim Update", &update_pl, &update_frag);
-        let normal_pipeline = make_sim_pipeline("WaterSim Normal", &sim_pl, &normal_frag);
-        let hitbox_pipeline = make_sim_pipeline("WaterSim Hitbox", &hitbox_pl, &hitbox_frag);
-
         // Placeholders until water exists (see `allocate_content`).
         let SimTextures {
             tex_a: sim_tex_a,
-            tex_b: sim_tex_b,
             array_a: sim_array_view_a,
             array_b: sim_array_view_b,
             layers_a: sim_layer_views_a,
-            layers_b: sim_layer_views_b,
         } = SimTextures::new(device, 1);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -601,50 +372,6 @@ impl WaterSimPass {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             ..Default::default()
-        });
-
-        let make_ubuf = |label, size: usize| {
-            device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some(label),
-                size: size as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })
-        };
-
-        let drop_buf = make_ubuf("WaterSim Drop Uniform", std::mem::size_of::<DropUniform>());
-        let update_bufs_labels: [String; 3] = [
-            "WaterSim Update Uniform C0".into(),
-            "WaterSim Update Uniform C1".into(),
-            "WaterSim Update Uniform C2".into(),
-        ];
-        let normal_bufs_labels: [String; 3] = [
-            "WaterSim Normal Uniform C0".into(),
-            "WaterSim Normal Uniform C1".into(),
-            "WaterSim Normal Uniform C2".into(),
-        ];
-        let mut update_bufs_vec: Vec<wgpu::Buffer> = Vec::with_capacity(CASCADE_COUNT as usize);
-        let mut normal_bufs_vec: Vec<wgpu::Buffer> = Vec::with_capacity(CASCADE_COUNT as usize);
-        for i in 0..CASCADE_COUNT as usize {
-            update_bufs_vec.push(make_ubuf(
-                &update_bufs_labels[i],
-                std::mem::size_of::<DeltaUniform>(),
-            ));
-            normal_bufs_vec.push(make_ubuf(
-                &normal_bufs_labels[i],
-                std::mem::size_of::<DeltaUniform>(),
-            ));
-        }
-        let hitbox_count_buf = make_ubuf(
-            "WaterSim Hitbox Count",
-            std::mem::size_of::<HitboxCountUniform>(),
-        );
-        let hitbox_prev_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("WaterSim Previous Hitboxes"),
-            size: u64::from(MAX_WATER_HITBOXES)
-                * std::mem::size_of::<crate::GpuWaterHitbox>() as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
         });
 
         let render_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -1861,9 +1588,6 @@ impl WaterSimPass {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        use std::convert::TryInto;
-        let n_updates = CASCADE_COUNT * MAX_SIM_VOLUMES as usize;
-
         Self {
             ocean_fft: crate::ocean_fft::OceanFft::new(device),
             surface_queries: crate::surface_query::WaterSurfaceQueries::new(device),
@@ -1877,36 +1601,14 @@ impl WaterSimPass {
             _shore_texture: shore_texture,
             shore_view,
             shore_params,
-            sim_bgl,
-            update_bgl,
-            hitbox_bgl,
-            drop_pipeline,
-            update_pipeline,
-            normal_pipeline,
-            hitbox_pipeline,
+            interaction: crate::simulation::Interaction::new(device),
             sim_tex_a,
-            sim_tex_b,
             sim_array_view_a,
             sim_array_view_b,
             sim_layer_views_a,
-            sim_layer_views_b,
-            front_per_layer: vec![true; n_updates],
             sampler,
             output_sampler,
             depth_sampler,
-            drop_buf,
-            update_bufs: update_bufs_vec
-                .try_into()
-                .unwrap_or_else(|_: Vec<wgpu::Buffer>| {
-                    panic!("CASCADE_COUNT doesn't match expected size")
-                }),
-            normal_bufs: normal_bufs_vec
-                .try_into()
-                .unwrap_or_else(|_: Vec<wgpu::Buffer>| {
-                    panic!("CASCADE_COUNT doesn't match expected size")
-                }),
-            hitbox_count_buf,
-            hitbox_prev_buf,
             hitbox_origin: [0.0; 3],
             hitbox_prev_shift: [0.0; 3],
             pending_drops: std::collections::VecDeque::new(),
@@ -1975,14 +1677,6 @@ impl WaterSimPass {
             caustics_bg_keys: [None, None, None],
             caustics_bgs: [None, None, None],
             render_bg: Default::default(),
-            normal_bgs: vec![None; n_updates],
-            normal_bg_keys: vec![None; n_updates],
-            hitbox_bgs: vec![None; n_updates * 2],
-            hitbox_bg_keys: vec![None; n_updates * 2],
-            drop_bg: None,
-            drop_bg_key: None,
-            update_bgs: vec![None; n_updates * 2],
-            update_bg_keys: vec![None; n_updates * 2],
             underwater_tint_bg: Default::default(),
             _tint_scratch_tex: tint_scratch_tex,
             tint_scratch_view,
@@ -2015,7 +1709,6 @@ impl WaterSimPass {
             wind_strength: 0.0,
             wave_scale: 1.0,
             wave_speed: 1.0,
-            sim_time: 0.0,
             step_clock: 0.0,
             steps_this_frame: 0,
         }

@@ -823,9 +823,6 @@ fn fs_above(in: VertexOutput) -> vec4f {
     let normal    = water_total_normal_fragment(in.surface_xz, vol, in.vol_index);
     let view_dir  = normalize(in.world_pos - cameras[0].position_near.xyz);
     let screen_uv = in.position.xy * viewport.zw;
-    if water_surface_occluded(screen_uv, in.world_pos) {
-        discard;
-    }
     let cascade_damp = shore_ocean_damp(in.surface_xz);
     let slope_variance = ocean_slope_variance(in.surface_xz, cascade_damp);
     let normal_dx = dpdx(normal);
@@ -997,9 +994,6 @@ fn fs_under(in: VertexOutput) -> vec4f {
     let normal    = -water_total_normal_fragment(in.surface_xz, vol, in.vol_index);
     let view_dir  = normalize(in.world_pos - cameras[0].position_near.xyz);
     let screen_uv = in.position.xy * viewport.zw;
-    if water_surface_occluded(screen_uv, in.world_pos) {
-        discard;
-    }
 
     let cascade_damp = shore_ocean_damp(in.surface_xz);
     let slope_variance = ocean_slope_variance(in.surface_xz, cascade_damp);
@@ -1064,6 +1058,8 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) front: bool) -> @location(0)
     let vol = volumes[in.vol_index];
     // A lake or pool draws inside its box only.
     if !water_volume_covers(vol, in.surface_xz) { discard; }
+    // Resolve opaque occlusion before evaluating waves, normals and optics.
+    if water_surface_occluded(in.position.xy * viewport.zw, in.world_pos) { discard; }
     let cam = cameras[0].position_near.xyz;
     let rest = vol.bounds_max.w;
     var cam_above = cam.y > rest || !water_volume_contains(vol, cam);

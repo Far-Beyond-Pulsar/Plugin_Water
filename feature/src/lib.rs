@@ -73,7 +73,7 @@ pub const MAX_SIM_VOLUMES: u32 = 8;
 /// nothing), so no per-frame CPU count of live hitboxes is ever needed to
 /// drive this pass's dispatch/draw bounds.
 pub const MAX_WATER_HITBOXES: u32 = 32;
-pub(crate) const CASCADE_PATCH_SIZES: [f32; 3] = [30.0, 90.0, 270.0];
+pub(crate) const INTERACTION_PATCH_SIZE: f32 = 30.0;
 /// Legacy interaction/caustics phase period. Ultra-Water's FFT surface uses
 /// independent f64-reduced phases for each patch instead of this shared period.
 pub const WATER_WORLD_PERIOD: f64 = 270.0;
@@ -245,37 +245,18 @@ pub struct WaterSimPass {
     pub(crate) _shore_texture: wgpu::Texture,
     pub(crate) shore_view: wgpu::TextureView,
     pub(crate) shore_params: wgpu::Buffer,
-    pub(crate) sim_bgl: wgpu::BindGroupLayout,
-    pub(crate) update_bgl: wgpu::BindGroupLayout,
-    pub(crate) hitbox_bgl: wgpu::BindGroupLayout,
-
-    pub(crate) drop_pipeline: wgpu::RenderPipeline,
-    pub(crate) update_pipeline: wgpu::RenderPipeline,
-    pub(crate) normal_pipeline: wgpu::RenderPipeline,
-    pub(crate) hitbox_pipeline: wgpu::RenderPipeline,
-
+    pub(crate) interaction: simulation::Interaction,
     pub(crate) sim_tex_a: wgpu::Texture,
-    pub(crate) sim_tex_b: wgpu::Texture,
     pub(crate) sim_array_view_a: wgpu::TextureView,
     pub(crate) sim_array_view_b: wgpu::TextureView,
     pub(crate) sim_layer_views_a: Vec<wgpu::TextureView>,
-    pub(crate) sim_layer_views_b: Vec<wgpu::TextureView>,
-    pub(crate) front_per_layer: Vec<bool>,
 
     pub(crate) sampler: wgpu::Sampler,
     pub(crate) output_sampler: wgpu::Sampler,
     pub(crate) depth_sampler: wgpu::Sampler,
 
-    pub(crate) drop_buf: wgpu::Buffer,
-    pub(crate) update_bufs: [wgpu::Buffer; 3],
-    pub(crate) normal_bufs: [wgpu::Buffer; 3],
-    pub(crate) hitbox_count_buf: wgpu::Buffer,
-    /// The hitbox rows as of the last frame that applied them: a row that
-    /// still holds the same body displaces from where it was then, so a
-    /// body that stops moving stops displacing water.
-    pub(crate) hitbox_prev_buf: wgpu::Buffer,
     /// The world origin the hitbox rows are relative to this frame, and how
-    /// far it moved since `hitbox_prev_buf` was captured (`xyz`), which the
+    /// far it moved since the previous hitbox rows were captured (`xyz`), which the
     /// shader subtracts from those rows.
     pub(crate) hitbox_origin: [f64; 3],
     pub(crate) hitbox_prev_shift: [f64; 3],
@@ -328,17 +309,6 @@ pub struct WaterSimPass {
     pub(crate) caustics_render_bgl: wgpu::BindGroupLayout,
     pub(crate) render_bgl: wgpu::BindGroupLayout,
     pub(crate) render_bg: helio_core::CachedBindGroup,
-    pub(crate) normal_bgs: Vec<Option<wgpu::BindGroup>>,
-    pub(crate) normal_bg_keys: Vec<Option<wgpu::TextureView>>,
-
-    /// Indexed like `update_bgs`; only each volume's cascade-0 layers are used.
-    pub(crate) hitbox_bgs: Vec<Option<wgpu::BindGroup>>,
-    pub(crate) hitbox_bg_keys: Vec<Option<(wgpu::TextureView, wgpu::Buffer, wgpu::Buffer)>>,
-    pub(crate) drop_bg: Option<wgpu::BindGroup>,
-    pub(crate) drop_bg_key: Option<wgpu::TextureView>,
-    /// Two per layer, indexed `layer * 2 + front`: one for each ping-pong source.
-    pub(crate) update_bgs: Vec<Option<wgpu::BindGroup>>,
-    pub(crate) update_bg_keys: Vec<Option<(wgpu::TextureView, wgpu::Buffer)>>,
     pub(crate) underwater_tint_bg: helio_core::CachedBindGroup,
 
     pub(crate) caustics_pipeline: wgpu::RenderPipeline,
@@ -417,8 +387,6 @@ pub struct WaterSimPass {
     pub(crate) wind_strength: f32,
     pub(crate) wave_scale: f32,
     pub(crate) wave_speed: f32,
-    /// Simulated seconds: the frame clock's advance, in whole steps.
-    pub(crate) sim_time: f32,
     /// Frame clock time not yet simulated (less than one step).
     pub(crate) step_clock: f32,
     /// Simulation steps this frame takes ([`SIM_STEP_SECONDS`] each).
@@ -646,9 +614,9 @@ impl WaterSimPass {
 
     /// The simulation's height field as of the last frame: one array layer
     /// per volume row and cascade (layer `volume * 3 + cascade`), RGBA16F
-    /// (R = height, G = velocity, B/A = normal XZ), `COPY_SRC`. Cascade `c`
-    /// tiles world XZ every `[30, 90, 270][c]` metres. Read-only
-    /// diagnostics, for tests that read the simulation back.
+    /// (R = height, G = velocity, B/A = normal XZ), `COPY_SRC`. The first
+    /// layer of each slot is the 30 m interaction patch. The other two
+    /// layers are reserved to preserve the diagnostic texture stride.
     pub fn sim_texture(&self) -> &wgpu::Texture {
         &self.sim_tex_a
     }
@@ -734,7 +702,7 @@ impl WaterSimPass {
 
     /// Clears every simulation layer back to the zeroed startup state.
     fn reset_simulation(&mut self, encoder: &mut CommandRecorder<'_>) {
-        for view in self.sim_layer_views_a.iter().chain(&self.sim_layer_views_b) {
+        for view in &self.sim_layer_views_a {
             encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("WaterSim Reset"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -752,11 +720,7 @@ impl WaterSimPass {
                 multiview_mask: None,
             });
         }
-        self.front_per_layer
-            .iter_mut()
-            .for_each(|front| *front = true);
-        // Bodies already in the water push it once as it starts.
-        encoder.clear_buffer(&self.hitbox_prev_buf, 0, None);
+        self.interaction.reset(encoder);
         self.hitbox_prev_shift = [0.0; 3];
     }
 
@@ -766,14 +730,10 @@ impl WaterSimPass {
     fn set_content_allocated(&mut self, device: &wgpu::Device, allocated: bool) {
         let sim = pipeline::SimTextures::new(device, if allocated { SIM_SIZE } else { 1 });
         self.sim_tex_a = sim.tex_a;
-        self.sim_tex_b = sim.tex_b;
         self.sim_array_view_a = sim.array_a;
         self.sim_array_view_b = sim.array_b;
         self.sim_layer_views_a = sim.layers_a;
-        self.sim_layer_views_b = sim.layers_b;
-        self.front_per_layer
-            .iter_mut()
-            .for_each(|front| *front = true);
+        self.interaction.invalidate_bindings();
         self.sim_live = false;
         self.content_allocated = allocated;
         self.resize_internal(device, self.internal_width, self.internal_height);
@@ -926,13 +886,8 @@ impl RenderPass for WaterSimPass {
         // relationship, so the borrow checker sees an unrelated, shorter
         // lifetime here instead; matches `ResourceRegistry::
         // write_texture_binding`'s own transmute for the same reason.
-        let view: &'a wgpu::TextureView = unsafe {
-            std::mem::transmute(if self.front_per_layer[0] {
-                &self.sim_layer_views_a[0]
-            } else {
-                &self.sim_layer_views_b[0]
-            })
-        };
+        let view: &'a wgpu::TextureView =
+            unsafe { std::mem::transmute(&self.sim_layer_views_a[0]) };
         frame.write(
             helio_core::ResourceKey::new("water_sim_texture"),
             view,
@@ -1053,7 +1008,6 @@ impl RenderPass for WaterSimPass {
         self.steps_this_frame = steps.min(MAX_SIM_STEPS_PER_FRAME);
         self.step_clock =
             (self.step_clock - steps as f32 * SIM_STEP_SECONDS).clamp(0.0, SIM_STEP_SECONDS);
-        self.sim_time += self.steps_this_frame as f32 * SIM_STEP_SECONDS;
         self.ocean_fft
             .prepare(ctx.queue, ctx.time_delta.max(0.0), ctx.world_origin);
         if self.spray_emitters_dirty {
@@ -1178,26 +1132,6 @@ impl RenderPass for WaterSimPass {
             center_eye[1],
         ];
         ctx.write_buffer(&self.shore_params, 0, bytemuck::cast_slice(&shore_params));
-        let step_dt = SIM_STEP_SECONDS;
-        for ci in 0..CASCADE_COUNT {
-            let delta = simulation::DeltaUniform {
-                delta: [1.0 / SIM_SIZE as f32, 1.0 / SIM_SIZE as f32],
-                spring: self.wave_spring,
-                damping: self.wave_damping,
-                wind_dir: self.wind_direction,
-                wind_strength: self.wind_strength,
-                time: self.sim_time,
-                wave_scale: self.wave_scale,
-                time_step: step_dt,
-                cascade_patch_size: CASCADE_PATCH_SIZES[ci],
-                cascade_id: ci as u32,
-                wave_speed: self.wave_speed,
-                _pad: [0.0; 3],
-            };
-            ctx.write_buffer(&self.update_bufs[ci], 0, bytemuck::bytes_of(&delta));
-            ctx.write_buffer(&self.normal_bufs[ci], 0, bytemuck::bytes_of(&delta));
-        }
-
         // Hitbox rows are relative to the frame's world origin; the previous
         // rows are relative to the one they were captured at.
         let origin = ctx.world_origin.to_array();
@@ -1206,30 +1140,24 @@ impl RenderPass for WaterSimPass {
         }
         self.hitbox_origin = origin;
 
-        // Fixed capacity, not a live count: `"water_hitboxes"` is a SceneDB
-        // buffer read directly by `execute()`/the hitbox shader (see
-        // `MAX_WATER_HITBOXES`'s doc) -- no per-frame CPU scan of the World
-        // is ever needed to produce this number.
-        ctx.write_buffer(
-            &self.hitbox_count_buf,
-            0,
-            bytemuck::bytes_of(&simulation::HitboxCountUniform {
-                count: MAX_WATER_HITBOXES,
-                _pad: [0; 3],
+        let drop = self.pending_drops.pop_front();
+        self.drop_staged = drop.is_some();
+        self.interaction.prepare(
+            ctx,
+            &simulation::SimUniform {
+                spring: self.wave_spring,
+                damping: self.wave_damping,
+                hitbox_count: MAX_WATER_HITBOXES,
+                _pad: 0,
                 previous_shift: [
                     self.hitbox_prev_shift[0] as f32,
                     self.hitbox_prev_shift[1] as f32,
                     self.hitbox_prev_shift[2] as f32,
                     0.0,
                 ],
-            }),
+                drop: drop.unwrap_or_default(),
+            },
         );
-
-        self.drop_staged = false;
-        if let Some(drop) = self.pending_drops.pop_front() {
-            ctx.write_buffer(&self.drop_buf, 0, bytemuck::bytes_of(&drop));
-            self.drop_staged = true;
-        }
 
         Ok(())
     }
@@ -1253,16 +1181,12 @@ impl RenderPass for WaterSimPass {
         // supplies wind-sea waves.
         {
             let mut encoder = ctx.graphics_cmds();
+            ctx.begin_gpu_scope(&mut encoder, "Water: FFT");
             self.ocean_fft.execute(&mut encoder);
+            ctx.end_gpu_scope(&mut encoder, "Water: FFT");
         }
-        // `"water_volumes"`/`"water_hitboxes"` are resolved fresh from the
-        // SceneDB mirror by key every frame -- no Renderer method, no
-        // Scene-owned arena, no CPU-tracked dirty range. Both buffers are
-        // fixed-capacity (`MAX_SIM_VOLUMES`/`MAX_WATER_HITBOXES` rows): a row
-        // with no live entity behind it is `Zeroable`-default, which every
-        // consuming shader stage below treats as inert (see each constant's
-        // doc and `surface.wgsl`'s `1e-4`-guarded extent/`hitbox.frag.wgsl`'s
-        // `strength == 0` short-circuit).
+        // The water row join places both tables on the GPU. Classify
+        // live interaction slots from those same rows without a CPU readback.
         let water_volumes_buf = ctx
             .scene_buffers
             .get(WATER_VOLUMES.key())
@@ -1279,361 +1203,32 @@ impl RenderPass for WaterSimPass {
             self.reset_simulation(&mut ctx.graphics_cmds());
         }
         self.sim_live = sim_live;
-        let volume_count = if sim_live { MAX_SIM_VOLUMES } else { 0 };
-        let hitbox_count = if water_hitboxes_buf.is_some() {
-            MAX_WATER_HITBOXES
-        } else {
-            0
-        };
-        let total_layers = volume_count * CASCADE_COUNT as u32;
-
-        let layer_view = |layer: usize, front: bool| -> &wgpu::TextureView {
-            if front {
-                &self.sim_layer_views_a[layer]
-            } else {
-                &self.sim_layer_views_b[layer]
-            }
-        };
-
-        // ---- 1. Hitbox displacement (cascade 0 of each volume) -------------
-        // World-space boxes, mapped into each volume's sim space by the
-        // shader (the draw's instance is the volume). Applied once per frame
-        // that steps the simulation, then remembered as the previous rows.
-        if let (true, Some(hitboxes_buf), Some(vols_buf)) = (
-            hitbox_count > 0 && volume_count > 0 && self.steps_this_frame > 0,
-            water_hitboxes_buf,
-            water_volumes_buf,
-        ) {
-            {
-                for vol_idx in 0..volume_count {
-                    let layer = (vol_idx * CASCADE_COUNT as u32) as usize;
-                    let src = layer_view(layer, self.front_per_layer[layer]);
-                    let dst = if self.front_per_layer[layer] {
-                        &self.sim_layer_views_b[layer]
-                    } else {
-                        &self.sim_layer_views_a[layer]
-                    };
-
-                    let new_key = (src.clone(), hitboxes_buf.clone(), vols_buf.clone());
-                    let slot = layer * 2 + self.front_per_layer[layer] as usize;
-                    if self.hitbox_bg_keys[slot].as_ref() != Some(&new_key) {
-                        self.hitbox_bgs[slot] =
-                            Some(ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                label: Some("WaterSim Hitbox BG"),
-                                layout: &self.hitbox_bgl,
-                                entries: &[
-                                    wgpu::BindGroupEntry {
-                                        binding: 0,
-                                        resource: wgpu::BindingResource::TextureView(src),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 1,
-                                        resource: wgpu::BindingResource::Sampler(&self.sampler),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 2,
-                                        resource: self.hitbox_count_buf.as_entire_binding(),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 3,
-                                        resource: hitboxes_buf.as_entire_binding(),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 4,
-                                        resource: self.hitbox_prev_buf.as_entire_binding(),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 5,
-                                        resource: vols_buf.as_entire_binding(),
-                                    },
-                                ],
-                            }));
-                        self.hitbox_bg_keys[slot] = Some(new_key);
-                    }
-                    let bg = self.hitbox_bgs[slot].as_ref().unwrap();
-
-                    let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                        view: dst,
-                        resolve_target: None,
-                        depth_slice: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })];
-                    let desc = wgpu::RenderPassDescriptor {
-                        label: Some("WaterSim Hitbox"),
-                        color_attachments: &color_attachments,
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
-                    };
-                    let mut pass = ctx.begin_render_pass(&desc);
-                    pass.set_pipeline(&self.hitbox_pipeline);
-                    pass.set_bind_group(0, bg, &[]);
-                    pass.draw(0..6, vol_idx..vol_idx + 1);
-                    drop(pass);
-                    self.front_per_layer[layer] = !self.front_per_layer[layer];
-                }
-            }
-            // Remember where every body was applied.
-            if hitboxes_buf.usage().contains(wgpu::BufferUsages::COPY_SRC) {
-                let size = hitboxes_buf.size().min(self.hitbox_prev_buf.size());
-                ctx.graphics_cmds().copy_buffer_to_buffer(
-                    hitboxes_buf,
-                    0,
-                    &self.hitbox_prev_buf,
-                    0,
-                    size,
-                );
+        if let Some(volumes) = water_volumes_buf {
+            let device = ctx.device;
+            let mut encoder = ctx.graphics_cmds();
+            ctx.begin_gpu_scope(&mut encoder, "Water: interaction");
+            let copied_hitboxes = self.interaction.execute(
+                device,
+                &mut encoder,
+                simulation::InteractionInputs {
+                    textures: [&self.sim_array_view_a, &self.sim_array_view_b],
+                    volumes,
+                    hitboxes: water_hitboxes_buf,
+                },
+                self.drop_staged,
+                self.steps_this_frame,
+            );
+            ctx.end_gpu_scope(&mut encoder, "Water: interaction");
+            if copied_hitboxes {
                 self.hitbox_prev_shift = [0.0; 3];
             }
         }
 
-        // ---- 2. Drop ripple (cascade 0 for all volumes) --------------------
-        if self.drop_staged {
-            for vol_idx in 0..volume_count {
-                let layer = (vol_idx * CASCADE_COUNT as u32) as usize;
-                let src = layer_view(layer, self.front_per_layer[layer]);
-                let dst = if self.front_per_layer[layer] {
-                    &self.sim_layer_views_b[layer]
-                } else {
-                    &self.sim_layer_views_a[layer]
-                };
-
-                if self.drop_bg_key.as_ref() != Some(src) {
-                    self.drop_bg = Some(ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("WaterSim Drop BG"),
-                        layout: &self.sim_bgl,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(src),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.sampler),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 2,
-                                resource: self.drop_buf.as_entire_binding(),
-                            },
-                        ],
-                    }));
-                    self.drop_bg_key = Some(src.clone());
-                }
-                let bg = self.drop_bg.as_ref().unwrap();
-
-                let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                    view: dst,
-                    resolve_target: None,
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })];
-                let desc = wgpu::RenderPassDescriptor {
-                    label: Some("WaterSim Drop"),
-                    color_attachments: &color_attachments,
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                };
-                let mut pass = ctx.begin_render_pass(&desc);
-                pass.set_pipeline(&self.drop_pipeline);
-                pass.set_bind_group(0, bg, &[]);
-                pass.draw(0..6, 0..1);
-                drop(pass);
-                self.front_per_layer[layer] = !self.front_per_layer[layer];
-            }
-        }
-
-        // ---- 3 & 4. Cascade wave propagation + normal recomputation --------
-        // One propagation step per simulation step this frame; none (and no
-        // normal pass, which would only recompute the same normals) while
-        // the frame clock is frozen.
-        let steps = self.steps_this_frame;
-        if let (Some(vols_buf), true) = (water_volumes_buf, steps > 0) {
-            for vol_idx in 0..volume_count {
-                let base = (vol_idx * CASCADE_COUNT as u32) as usize;
-                for ci in 0..CASCADE_COUNT {
-                    let layer = base + ci;
-
-                    // ---- 3. Wave propagation (`steps` per layer) ---------------------
-                    for i in 0..steps {
-                        let src = layer_view(layer, self.front_per_layer[layer]);
-                        let dst = if self.front_per_layer[layer] {
-                            &self.sim_layer_views_b[layer]
-                        } else {
-                            &self.sim_layer_views_a[layer]
-                        };
-
-                        let update_key = (src.clone(), vols_buf.clone());
-                        // One slot per ping-pong side: with several steps a
-                        // frame the source alternates, and a single slot
-                        // would rebuild on every step.
-                        let slot = layer * 2 + self.front_per_layer[layer] as usize;
-                        if self.update_bg_keys[slot].as_ref() != Some(&update_key) {
-                            let bg_label = format!("WaterSim Update BG V{} C{}", vol_idx, ci);
-                            self.update_bgs[slot] =
-                                Some(ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                    label: Some(&bg_label),
-                                    layout: &self.update_bgl,
-                                    entries: &[
-                                        wgpu::BindGroupEntry {
-                                            binding: 0,
-                                            resource: wgpu::BindingResource::TextureView(src),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 1,
-                                            resource: wgpu::BindingResource::Sampler(&self.sampler),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 2,
-                                            resource: self.update_bufs[ci].as_entire_binding(),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 3,
-                                            resource: vols_buf.as_entire_binding(),
-                                        },
-                                    ],
-                                }));
-                            self.update_bg_keys[slot] = Some(update_key);
-                        }
-                        let bg = self.update_bgs[slot].as_ref().unwrap();
-
-                        let label_str = format!("WaterSim Update {} V{} C{}", i + 1, vol_idx, ci);
-                        let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                            view: dst,
-                            resolve_target: None,
-                            depth_slice: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })];
-                        let desc = wgpu::RenderPassDescriptor {
-                            label: Some(&label_str),
-                            color_attachments: &color_attachments,
-                            depth_stencil_attachment: None,
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                            multiview_mask: None,
-                        };
-                        let mut pass = ctx.begin_render_pass(&desc);
-                        pass.set_pipeline(&self.update_pipeline);
-                        pass.set_bind_group(0, bg, &[]);
-                        // The instance is the volume whose row it reads.
-                        pass.draw(0..6, vol_idx..vol_idx + 1);
-                        drop(pass);
-                        self.front_per_layer[layer] = !self.front_per_layer[layer];
-                    }
-
-                    // ---- 4. Normal recomputation (per layer) --------------------------
-                    {
-                        let src = layer_view(layer, self.front_per_layer[layer]);
-                        let dst = if self.front_per_layer[layer] {
-                            &self.sim_layer_views_b[layer]
-                        } else {
-                            &self.sim_layer_views_a[layer]
-                        };
-
-                        if self.normal_bg_keys[layer].as_ref() != Some(src) {
-                            let nrm_label = format!("WaterSim Normal BG V{} C{}", vol_idx, ci);
-                            self.normal_bgs[layer] =
-                                Some(ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                    label: Some(&nrm_label),
-                                    layout: &self.sim_bgl,
-                                    entries: &[
-                                        wgpu::BindGroupEntry {
-                                            binding: 0,
-                                            resource: wgpu::BindingResource::TextureView(src),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 1,
-                                            resource: wgpu::BindingResource::Sampler(&self.sampler),
-                                        },
-                                        wgpu::BindGroupEntry {
-                                            binding: 2,
-                                            resource: self.normal_bufs[ci].as_entire_binding(),
-                                        },
-                                    ],
-                                }));
-                            self.normal_bg_keys[layer] = Some(src.clone());
-                        }
-                        let bg = self.normal_bgs[layer].as_ref().unwrap();
-
-                        let nrm_pass_label = format!("WaterSim Normal V{} C{}", vol_idx, ci);
-                        let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                            view: dst,
-                            resolve_target: None,
-                            depth_slice: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })];
-                        let desc = wgpu::RenderPassDescriptor {
-                            label: Some(&nrm_pass_label),
-                            color_attachments: &color_attachments,
-                            depth_stencil_attachment: None,
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                            multiview_mask: None,
-                        };
-                        let mut pass = ctx.begin_render_pass(&desc);
-                        pass.set_pipeline(&self.normal_pipeline);
-                        pass.set_bind_group(0, bg, &[]);
-                        pass.draw(0..6, 0..1);
-                        drop(pass);
-                        self.front_per_layer[layer] = !self.front_per_layer[layer];
-                    }
-                }
-            }
-        }
-
-        // ---- Consolidate: copy any layers still on tex_b to tex_a --------
-        // After simulation, ensure all layers are on tex_a for rendering.
-        let mut encoder = ctx.graphics_cmds();
-        for layer in 0..total_layers as usize {
-            if !self.front_per_layer[layer] {
-                encoder.copy_texture_to_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &self.sim_tex_b,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d {
-                            x: 0,
-                            y: 0,
-                            z: layer as u32,
-                        },
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &self.sim_tex_a,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d {
-                            x: 0,
-                            y: 0,
-                            z: layer as u32,
-                        },
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    wgpu::Extent3d {
-                        width: SIM_SIZE,
-                        height: SIM_SIZE,
-                        depth_or_array_layers: 1,
-                    },
-                );
-                self.front_per_layer[layer] = true;
-            }
-        }
-
-        // ---- 5. Global FFT caustics by area-ratio triangle splats ------------
-        if volume_count > 0 {
+        // Global FFT caustics by area-ratio triangle splats.
+        if sim_live {
             if let Some(vols_buf) = water_volumes_buf {
+                let mut cmds = ctx.graphics_cmds();
+                ctx.begin_gpu_scope(&mut cmds, "Water: caustics");
                 let new_key = (vols_buf.clone(), self.ocean_fft.slopes_view().clone());
                 for slice in 0..3 {
                     if self.caustics_bg_keys[slice].as_ref() != Some(&new_key) {
@@ -1828,6 +1423,7 @@ impl RenderPass for WaterSimPass {
                     pass.set_bind_group(0, &bind_group, &[]);
                     pass.draw(0..3, 0..1);
                 }
+                ctx.end_gpu_scope(&mut cmds, "Water: caustics");
             }
         }
 
@@ -1840,7 +1436,7 @@ impl RenderPass for WaterSimPass {
             return Ok(());
         }
 
-        // ---- 6. Blit pre_aa -> water_output (scene baseline) -----------------
+        // Blit pre_aa into the water output as the scene baseline.
         if self.water_output_view.is_none() {
             self.water_output_view = ctx.resource_pool.get_view("water_output").cloned();
         }
@@ -1962,8 +1558,8 @@ impl RenderPass for WaterSimPass {
             self.foam_baked = true;
         }
 
-        // ---- 7. Water surface render -> water_output --------------------------
-        if volume_count > 0 {
+        // Draw the water surface into the water output.
+        if sim_live {
             if let Some(vols_buf) = water_volumes_buf {
                 let gbuffer_normal_view = ctx
                     .registry
@@ -2175,6 +1771,7 @@ impl RenderPass for WaterSimPass {
                 // AABB no longer bounds the ocean surface.
                 {
                     let mut cmds = ctx.graphics_cmds();
+                    ctx.begin_gpu_scope(&mut cmds, "Water: surface");
                     let mut pass = cmds.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Water Surface"),
                         color_attachments: &color_attachments,
@@ -2197,6 +1794,8 @@ impl RenderPass for WaterSimPass {
                     pass.set_vertex_buffer(0, self.top_vbuf.slice(..));
                     pass.set_index_buffer(self.top_ibuf.slice(..), wgpu::IndexFormat::Uint32);
                     pass.draw_indexed(0..self.top_index_count, 0, 0..1);
+                    drop(pass);
+                    ctx.end_gpu_scope(&mut cmds, "Water: surface");
                 }
 
                 // Shore-breaker puffs and bounded user-submitted impact
