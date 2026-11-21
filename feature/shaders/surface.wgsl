@@ -54,7 +54,6 @@ struct OceanPhase { patches: array<vec4f, 4> }
 @group(0) @binding(19) var<storage, read> reflection_cameras: array<Camera, 1>;
 @group(0) @binding(20) var planar_reflection_tex: texture_2d<f32>;
 @group(0) @binding(25) var<uniform> sky_frame: SkyFrame;
-@group(0) @binding(26) var<uniform> sky_table: array<vec4<f32>, 2304>;
 @group(0) @binding(27) var sky_view_lut: texture_2d<f32>;
 @group(0) @binding(28) var<storage, read> water_lights: array<GpuLight>;
 fn water_sky_lut(uv: vec2f) -> vec3f {
