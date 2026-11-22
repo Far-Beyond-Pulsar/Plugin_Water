@@ -26,14 +26,16 @@ use std::{
 const VG_INSTANCES: BufferKey = BufferKey::of("vg_instances");
 const VG_INSTANCE_COUNT: BufferKey = BufferKey::of("vg_instance_count");
 const VG_ASSET_READY: BufferKey = BufferKey::of("vg_asset_ready");
+/// Bytes of a `vg_asset_ready` row.
+const READY_ROW_BYTES: u64 = std::mem::size_of::<VgAssetReadyRow>() as u64;
 const CLASSIC_SUPPRESSED: BufferKey = BufferKey::of("classic_suppressed");
 const SCENE_OBJECTS_STRUCTURE: BufferKey = BufferKey::of("scene_objects_structure");
 const VG_FLAGS: u32 = INST_ENABLED | INST_SHADOW_CASTER | INST_LOD_SUPPRESS | INST_CONE_CULL;
 
 #[derive(Clone, Copy)]
 struct VgTarget {
-    vertex_offset: u32,
-    vertex_count: u32,
+    /// The asset's content id (`VgAssetReadyRow::content` words).
+    content: [u32; 4],
     object_row: u32,
 }
 
@@ -49,8 +51,7 @@ struct Targets {
 #[derive(Clone, Copy)]
 pub struct Asset {
     pub mesh: Entity,
-    offset: u32,
-    count: u32,
+    content: u128,
 }
 
 pub struct Vg {
@@ -128,16 +129,16 @@ impl Vg {
                 indices: vec![0, 1, 2],
             },
         );
-        let mirror = world.gpu_mirror().cloned().ok_or("no GPU mirror")?;
-        let range =
-            helio_mesh_host::MeshComponent::vertices_gpu_handle(mirror.store(), mesh.index())
-                .ok_or("placeholder vertex range")?;
-        self.runtime
-            .request_asset(content, range.offset, range.count, vgeo);
+        // The placeholder names the asset for the ray-traced scene; the
+        // instances name it by its content id.
+        world.insert(
+            mesh,
+            helio_mesh_host::ray_proxies::VirtualGeometryMesh { content },
+        );
+        self.runtime.request_asset(content, vgeo);
         let asset = Asset {
             mesh,
-            offset: range.offset,
-            count: range.count,
+            content,
         };
         self.by_content.insert(content, asset);
         Ok(asset)
@@ -159,8 +160,7 @@ impl Vg {
         t.object_rows = t.object_rows.max(object.index() + 1);
         t.structure += 1;
         t.targets.push(VgTarget {
-            vertex_offset: asset.offset,
-            vertex_count: asset.count,
+            content: VgAssetReadyRow::content_words(content_words(asset.content)),
             object_row: object.index(),
         });
         t.generation += 1;
@@ -266,14 +266,14 @@ fn select_visible(
     ready: &[VgAssetReadyRow],
     classic: &mut [u32],
 ) -> Vec<GpuVgInstance> {
-    let slots: HashMap<(u32, u32), u32> = ready
+    let slots: HashMap<[u32; 4], u32> = ready
         .iter()
         .filter(|r| r.flags & VG_ASSET_READY_FLAG_READY != 0)
-        .map(|r| ((r.vertex_offset, r.vertex_count), r.asset_slot))
+        .map(|r| (r.content, r.asset_slot))
         .collect();
     let mut out = Vec::new();
     for target in targets {
-        let Some(&asset_slot) = slots.get(&(target.vertex_offset, target.vertex_count)) else {
+        let Some(&asset_slot) = slots.get(&target.content) else {
             continue;
         };
         out.push(GpuVgInstance {
@@ -321,7 +321,7 @@ impl Derivation {
             targets,
             instances: buffer(device, "VG Instances", 16),
             count: buffer(device, "VG Instance Count", 16),
-            ready: buffer(device, "VG Asset Ready", 16),
+            ready: buffer(device, "VG Asset Ready", READY_ROW_BYTES),
             classic: buffer(device, "VG Classic Suppression", 4),
             marker: buffer(device, "VG Structure Marker", 16),
             instance_capacity: 1,
@@ -365,7 +365,7 @@ impl SceneDerivation for Derivation {
             self.ready = buffer(
                 ctx.device,
                 "VG Asset Ready",
-                self.ready_capacity as u64 * 16,
+                self.ready_capacity as u64 * READY_ROW_BYTES,
             );
             self.buffer_epoch += 1;
             grew = true;
@@ -422,7 +422,7 @@ impl SceneDerivation for Derivation {
                 ),
                 (
                     VG_ASSET_READY,
-                    Self::handle(&self.ready, 16, self.content_generation, self.buffer_epoch),
+                    Self::handle(&self.ready, READY_ROW_BYTES, self.content_generation, self.buffer_epoch),
                 ),
                 (
                     CLASSIC_SUPPRESSED,
