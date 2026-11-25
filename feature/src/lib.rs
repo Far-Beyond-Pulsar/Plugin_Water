@@ -289,10 +289,9 @@ pub struct WaterSimPass {
     pub(crate) caustics_mip_pipeline: helio_core::shader::DeferredRender,
 
     pub(crate) caustics_sampler: wgpu::Sampler,
-    /// Zeroed atmosphere frame / sky table, bound until a sky publishes.
+    /// Zeroed atmosphere frame, bound until a sky publishes.
     pub(crate) fallback_atmosphere: wgpu::Buffer,
     pub(crate) fallback_lights: wgpu::Buffer,
-    pub(crate) fallback_sky_table: wgpu::Buffer,
     pub(crate) _fallback_sky_view_tex: wgpu::Texture,
     pub(crate) fallback_sky_view: wgpu::TextureView,
 
@@ -857,7 +856,6 @@ impl RenderPass for WaterSimPass {
             helio_frame_api::depth::HIZ_NEAREST,
             // The sky the sea reflects and scatters.
             helio_frame_api::lighting::sky::SKY_FRAME,
-            helio_frame_api::lighting::sky::SKY_TABLE,
             helio_frame_api::lighting::sky::SKY_VIEW,
         ]
     }
@@ -1590,12 +1588,6 @@ impl RenderPass for WaterSimPass {
                         helio_frame_api::lighting::sky::SKY_FRAME,
                     ))
                     .unwrap_or(&self.fallback_atmosphere);
-                let sky_table_buf = ctx
-                    .registry
-                    .get::<&wgpu::Buffer>(helio_core::ResourceKey::new(
-                        helio_frame_api::lighting::sky::SKY_TABLE,
-                    ))
-                    .unwrap_or(&self.fallback_sky_table);
 
                 let sky_view_tex = ctx
                     .registry
@@ -1738,10 +1730,6 @@ impl RenderPass for WaterSimPass {
                                 wgpu::BindGroupEntry {
                                     binding: 25,
                                     resource: atmosphere_buf.as_entire_binding(),
-                                },
-                                wgpu::BindGroupEntry {
-                                    binding: 26,
-                                    resource: sky_table_buf.as_entire_binding(),
                                 },
                                 wgpu::BindGroupEntry {
                                     binding: 27,

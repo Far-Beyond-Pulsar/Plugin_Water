@@ -593,18 +593,6 @@ impl WaterSimPass {
                     },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 26,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new(
-                            helio_frame_api::lighting::sky::SKY_TABLE_BYTES,
-                        ),
-                    },
-                    count: None,
-                },
                 // The sky-view LUT: the sky's radiance by direction, the same
                 // table the sky is drawn from.
                 texture_entry(
@@ -641,12 +629,6 @@ impl WaterSimPass {
         let fallback_atmosphere = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Water No Atmosphere"),
             size: helio_frame_api::lighting::sky::SKY_FRAME_BYTES,
-            usage: wgpu::BufferUsages::UNIFORM,
-            mapped_at_creation: false,
-        });
-        let fallback_sky_table = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Water No Sky Table"),
-            size: helio_frame_api::lighting::sky::SKY_TABLE_BYTES,
             usage: wgpu::BufferUsages::UNIFORM,
             mapped_at_creation: false,
         });
@@ -1634,7 +1616,6 @@ impl WaterSimPass {
             caustics_sampler,
             fallback_atmosphere,
             fallback_lights,
-            fallback_sky_table,
             _fallback_sky_view_tex: fallback_sky_view_tex,
             fallback_sky_view,
             _foam_texture: foam_texture,
