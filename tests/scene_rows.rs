@@ -410,7 +410,7 @@ fn bodies_on_the_water_sim_channel_become_water_hitboxes() {
         return;
     };
     let mesh = StaticMeshComponent {
-        indices: vec![0, 1, 2],
+        indices: vec![0, 1, 2].into(),
         bounds_local: [0.0, 0.5, 0.0, 1.0],
         ..Default::default()
     };
