@@ -30,7 +30,7 @@ const MASK: &str = helio_frame_api::color::REACTIVE_MASK;
 pub struct WaterReactivityPass {
     /// The frame's first writer of the mask: allocates and clears it.
     first: bool,
-    pipeline: wgpu::RenderPipeline,
+    pipeline: helio_core::shader::DeferredRender,
     layout: wgpu::BindGroupLayout,
     group: Option<(wgpu::TextureView, wgpu::BindGroup)>,
 }
@@ -68,7 +68,7 @@ impl WaterReactivityPass {
             dst_factor: wgpu::BlendFactor::One,
             operation: wgpu::BlendOperation::Max,
         };
-        let pipeline = helio_core::shader::create_render_pipeline(
+        let pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water reactivity"),

@@ -39,13 +39,13 @@ pub(crate) struct InteractionInputs<'a> {
 }
 
 pub(crate) struct Interaction {
-    classify: wgpu::ComputePipeline,
-    clear_retired: wgpu::ComputePipeline,
-    displace: wgpu::ComputePipeline,
-    add_drop: wgpu::ComputePipeline,
-    propagate: wgpu::ComputePipeline,
-    normals: wgpu::ComputePipeline,
-    publish: wgpu::ComputePipeline,
+    classify: helio_core::shader::DeferredCompute,
+    clear_retired: helio_core::shader::DeferredCompute,
+    displace: helio_core::shader::DeferredCompute,
+    add_drop: helio_core::shader::DeferredCompute,
+    propagate: helio_core::shader::DeferredCompute,
+    normals: helio_core::shader::DeferredCompute,
+    publish: helio_core::shader::DeferredCompute,
     solve_layout: wgpu::BindGroupLayout,
     args: wgpu::Buffer,
     slots: wgpu::Buffer,
@@ -107,7 +107,7 @@ impl Interaction {
                 immediate_size: 0,
             });
         let make_pipeline = |label, entry_point, layout, constants| {
-            helio_core::shader::create_compute_pipeline(
+            helio_core::shader::create_compute_pipeline_deferred(
                 device,
                 wgpu::ComputePipelineDescriptor {
                     label: Some(label),

@@ -188,17 +188,17 @@ pub struct OceanFft {
     phase_uniform: wgpu::Buffer,
     evolve_uniform: wgpu::Buffer,
     evolve_bg: wgpu::BindGroup,
-    evolve_pipeline: wgpu::RenderPipeline,
-    init_pipeline: wgpu::RenderPipeline,
+    evolve_pipeline: helio_core::shader::DeferredRender,
+    init_pipeline: helio_core::shader::DeferredRender,
     init_bg: wgpu::BindGroup,
     fft_uniforms: Vec<wgpu::Buffer>,
     fft_bgs: [Vec<wgpu::BindGroup>; 2],
-    fft_pipeline: wgpu::RenderPipeline,
+    fft_pipeline: helio_core::shader::DeferredRender,
     assemble_uniforms: [wgpu::Buffer; CASCADE_COUNT],
     assemble_bgs: Vec<[[wgpu::BindGroup; 2]; 2]>,
-    assemble_pipeline: wgpu::RenderPipeline,
+    assemble_pipeline: helio_core::shader::DeferredRender,
     mip_bgs: Vec<Vec<wgpu::BindGroup>>,
-    mip_pipeline: wgpu::RenderPipeline,
+    mip_pipeline: helio_core::shader::DeferredRender,
     _h0: wgpu::Texture,
     h0_view: wgpu::TextureView,
     ping: FftAtlases,
@@ -354,7 +354,7 @@ impl OceanFft {
                     })
                 })
                 .collect::<Vec<_>>();
-            helio_core::shader::create_render_pipeline(
+            helio_core::shader::create_render_pipeline_deferred(
                 device,
                 wgpu::RenderPipelineDescriptor {
                     label: Some(label),
@@ -385,7 +385,7 @@ impl OceanFft {
             bind_group_layouts: &[Some(&init_bgl)],
             immediate_size: 0,
         });
-        let init_pipeline = helio_core::shader::create_render_pipeline(
+        let init_pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Ultra Water Spectrum Init"),

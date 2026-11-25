@@ -286,7 +286,7 @@ pub struct WaterSimPass {
     pub(crate) _caustics_deep_tex: wgpu::Texture,
     pub(crate) caustics_deep_view: wgpu::TextureView,
     pub(crate) caustics_deep_mip_views: Vec<wgpu::TextureView>,
-    pub(crate) caustics_mip_pipeline: wgpu::RenderPipeline,
+    pub(crate) caustics_mip_pipeline: helio_core::shader::DeferredRender,
 
     pub(crate) caustics_sampler: wgpu::Sampler,
     /// Zeroed atmosphere frame / sky table, bound until a sky publishes.
@@ -301,9 +301,9 @@ pub struct WaterSimPass {
     pub(crate) foam_view: wgpu::TextureView,
     pub(crate) foam_mip_views: Vec<wgpu::TextureView>,
     pub(crate) foam_sampler: wgpu::Sampler,
-    pub(crate) foam_bake_pipeline: wgpu::RenderPipeline,
+    pub(crate) foam_bake_pipeline: helio_core::shader::DeferredRender,
     pub(crate) foam_mip_bgl: wgpu::BindGroupLayout,
-    pub(crate) foam_mip_pipeline: wgpu::RenderPipeline,
+    pub(crate) foam_mip_pipeline: helio_core::shader::DeferredRender,
     pub(crate) foam_baked: bool,
 
     pub(crate) caustics_render_bgl: wgpu::BindGroupLayout,
@@ -311,8 +311,8 @@ pub struct WaterSimPass {
     pub(crate) render_bg: helio_core::CachedBindGroup,
     pub(crate) underwater_tint_bg: helio_core::CachedBindGroup,
 
-    pub(crate) caustics_pipeline: wgpu::RenderPipeline,
-    pub(crate) surface_pipeline: wgpu::RenderPipeline,
+    pub(crate) caustics_pipeline: helio_core::shader::DeferredRender,
+    pub(crate) surface_pipeline: helio_core::shader::DeferredRender,
 
     pub(crate) _pre_aa_fallback_tex: wgpu::Texture,
     pub(crate) pre_aa_fallback_view: wgpu::TextureView,
@@ -326,7 +326,7 @@ pub struct WaterSimPass {
     pub(crate) viewport_buf: wgpu::Buffer,
 
     pub(crate) blit_bgl: wgpu::BindGroupLayout,
-    pub(crate) blit_pipeline: wgpu::RenderPipeline,
+    pub(crate) blit_pipeline: helio_core::shader::DeferredRender,
     pub(crate) blit_bg: Option<wgpu::BindGroup>,
     pub(crate) blit_bg_key: Option<wgpu::TextureView>,
 
@@ -356,17 +356,17 @@ pub struct WaterSimPass {
     /// Samples `tint_scratch_view` for the blit back; rebuilt with it on resize.
     pub(crate) tint_blit_bg: Option<wgpu::BindGroup>,
     pub(crate) underwater_tint_bgl: wgpu::BindGroupLayout,
-    pub(crate) underwater_tint_pipeline: wgpu::RenderPipeline,
+    pub(crate) underwater_tint_pipeline: helio_core::shader::DeferredRender,
     pub(crate) _shafts_scratch_tex: wgpu::Texture,
     pub(crate) shafts_view: wgpu::TextureView,
     pub(crate) shafts_bgl: wgpu::BindGroupLayout,
-    pub(crate) shafts_pipeline: wgpu::RenderPipeline,
+    pub(crate) shafts_pipeline: helio_core::shader::DeferredRender,
     pub(crate) shafts_bg: helio_core::CachedBindGroup,
 
     /// Shore-breaker spray and bounded impact-crown droplets.
     pub(crate) spray_bgl: wgpu::BindGroupLayout,
-    pub(crate) spray_breaker_pipeline: wgpu::RenderPipeline,
-    pub(crate) spray_impact_pipeline: wgpu::RenderPipeline,
+    pub(crate) spray_breaker_pipeline: helio_core::shader::DeferredRender,
+    pub(crate) spray_impact_pipeline: helio_core::shader::DeferredRender,
     pub(crate) spray_bg: helio_core::CachedBindGroup,
     pub(crate) spray_impacts_buf: wgpu::Buffer,
     pub(crate) spray_params_buf: wgpu::Buffer,

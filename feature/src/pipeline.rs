@@ -218,7 +218,7 @@ pub(crate) fn shafts_scratch(
 /// draws with it; the caustics test drives the same one.
 pub struct CausticsProjection {
     pub bind_group_layout: wgpu::BindGroupLayout,
-    pub pipeline: wgpu::RenderPipeline,
+    pub pipeline: helio_core::shader::DeferredRender,
 }
 
 impl CausticsProjection {
@@ -277,7 +277,7 @@ impl CausticsProjection {
             &[crate::WATER_VOLUME_SNIPPET],
         );
         let vbl = vec4_vbl();
-        let caustics_pipeline = helio_core::shader::create_render_pipeline(
+        let caustics_pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Caustics Pipeline"),
@@ -763,7 +763,7 @@ impl WaterSimPass {
             bind_group_layouts: &[Some(&blit_bgl)],
             immediate_size: 0,
         });
-        let blit_pipeline = helio_core::shader::create_render_pipeline(
+        let blit_pipeline = helio_core::shader::create_render_pipeline_deferred(
             &device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Blit Pipeline"),
@@ -934,7 +934,7 @@ impl WaterSimPass {
             bind_group_layouts: &[Some(&underwater_tint_bgl)],
             immediate_size: 0,
         });
-        let underwater_tint_pipeline = helio_core::shader::create_render_pipeline(
+        let underwater_tint_pipeline = helio_core::shader::create_render_pipeline_deferred(
             &device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Underwater Tint Pipeline"),
@@ -1018,7 +1018,7 @@ impl WaterSimPass {
             bind_group_layouts: &[Some(&shafts_bgl)],
             immediate_size: 0,
         });
-        let shafts_pipeline = helio_core::shader::create_render_pipeline(
+        let shafts_pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Half-Resolution Shafts Pipeline"),
@@ -1091,7 +1091,7 @@ impl WaterSimPass {
             bind_group_layouts: &[],
             immediate_size: 0,
         });
-        let foam_bake_pipeline = helio_core::shader::create_render_pipeline(
+        let foam_bake_pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Foam Bake Pipeline"),
@@ -1153,7 +1153,7 @@ impl WaterSimPass {
             "Water Foam Mip Shader",
             helio_core::include_wgsl!("../shaders/foam_mip.wgsl"),
         );
-        let foam_mip_pipeline = helio_core::shader::create_render_pipeline(
+        let foam_mip_pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Foam Mip Pipeline"),
@@ -1187,7 +1187,7 @@ impl WaterSimPass {
 
         // The same explicit box-filter pass builds independent mip chains for
         // near and deep caustics, without atlas-slice bleed at repeat seams.
-        let caustics_mip_pipeline = helio_core::shader::create_render_pipeline(
+        let caustics_mip_pipeline = helio_core::shader::create_render_pipeline_deferred(
             device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Caustics Mip Pipeline"),
@@ -1219,7 +1219,7 @@ impl WaterSimPass {
             },
         );
 
-        let surface_pipeline = helio_core::shader::create_render_pipeline(
+        let surface_pipeline = helio_core::shader::create_render_pipeline_deferred(
             &device,
             wgpu::RenderPipelineDescriptor {
                 label: Some("Water Surface Pipeline"),
@@ -1392,7 +1392,7 @@ impl WaterSimPass {
             immediate_size: 0,
         });
         let spray_pipeline = |label: &'static str, entry_point: &'static str| {
-            helio_core::shader::create_render_pipeline(
+            helio_core::shader::create_render_pipeline_deferred(
                 device,
                 wgpu::RenderPipelineDescriptor {
                     label: Some(label),
