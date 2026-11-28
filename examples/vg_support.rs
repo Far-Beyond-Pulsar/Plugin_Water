@@ -136,10 +136,7 @@ impl Vg {
             helio_mesh_host::ray_proxies::VirtualGeometryMesh { content },
         );
         self.runtime.request_asset(content, vgeo);
-        let asset = Asset {
-            mesh,
-            content,
-        };
+        let asset = Asset { mesh, content };
         self.by_content.insert(content, asset);
         Ok(asset)
     }
@@ -202,14 +199,14 @@ fn pack_attributes(vertices: &[PackedVertex]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(vertices.len() * helio_vg_format::ATTR_STRIDE as usize);
     for vertex in vertices {
         let tangent = (vertex.tangent & 0x00ff_ffff)
-            | ((if vertex.bitangent_sign < 0.0 {
+            | ((if vertex.bitangent_sign() < 0.0 {
                 0x81u32
             } else {
                 0x7fu32
             }) << 24);
         bytes.extend_from_slice(&vertex.normal.to_le_bytes());
         bytes.extend_from_slice(&tangent.to_le_bytes());
-        for uv in [vertex.tex_coords0, vertex.tex_coords1] {
+        for uv in [vertex.tex_coords0, vertex.lightmap_uv()] {
             bytes.extend_from_slice(&half::f16::from_f32(uv[0]).to_bits().to_le_bytes());
             bytes.extend_from_slice(&half::f16::from_f32(uv[1]).to_bits().to_le_bytes());
         }
@@ -422,7 +419,12 @@ impl SceneDerivation for Derivation {
                 ),
                 (
                     VG_ASSET_READY,
-                    Self::handle(&self.ready, READY_ROW_BYTES, self.content_generation, self.buffer_epoch),
+                    Self::handle(
+                        &self.ready,
+                        READY_ROW_BYTES,
+                        self.content_generation,
+                        self.buffer_epoch,
+                    ),
                 ),
                 (
                     CLASSIC_SUPPRESSED,
